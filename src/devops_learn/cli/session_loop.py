@@ -4,6 +4,11 @@ Dispatches raw learner input to one TutorOrchestrator method per turn. Menu
 selections are interpreted by matching the currently offered MenuOption's
 label (see _handle_menu_selection) rather than hardcoding per-task branches,
 so new curriculum content stays wired up without new session_loop code.
+
+A task may display a check question and a next-step menu whose option keys
+overlap (module 1 offers A-D for both). A single letter is therefore resolved
+against the question only while it is on screen (TurnResult.question_keys),
+then against the menu, so neither can shadow the other.
 """
 
 from __future__ import annotations
@@ -11,14 +16,15 @@ from __future__ import annotations
 from devops_learn.cli.presenters import render_turn
 from devops_learn.domain.content import MenuOption
 from devops_learn.domain.curriculum_models import Task
-from devops_learn.domain.enums import AssistanceLevel, ExplanationDepth
+from devops_learn.domain.enums import AssistanceLevel, ContentBlockKind, ExplanationDepth
 from devops_learn.domain.learner_models import LearningSession
 from devops_learn.tutor.bootstrap import Platform
 from devops_learn.tutor.orchestrator import TurnResult
-from devops_learn.workflows.troubleshooting_flow import is_troubleshooting_task, scenario_for_task
+from devops_learn.workflows.troubleshooting_flow import scenario_for_task
 from devops_learn.troubleshooting.menu import MenuKeyError, resolve_diagnosis, resolve_source
 
 _QUIT_COMMANDS = {"quit", "exit"}
+_ADVANCE_WORDS = ("continue", "next", "move on", "advance", "done", "skip")
 
 
 def run_interactive_session(
@@ -87,15 +93,10 @@ def _dispatch(
         topic = text[len("explain"):].strip() or turn.heading
         return orchestrator.explain(session, topic, level=level, depth=depth)
 
-    task = (
-        platform.curriculum_service.task(session.current_task_id)
-        if session.current_task_id
-        else None
-    )
+    task = platform.curriculum_service.find_task(session.current_task_id)
 
-    if task is not None and is_troubleshooting_task(task.id):
-        scenario = scenario_for_task(task.id)
-        assert scenario is not None
+    scenario = scenario_for_task(task.id) if task is not None else None
+    if scenario is not None:
         if lower.startswith("diagnose"):
             key = text[len("diagnose"):].strip().upper()
             try:
@@ -121,17 +122,17 @@ def _dispatch(
                     status_message=f"{source.label}: {source.evidence_text}",
                 )
 
-    if task is not None and len(text) == 1 and text.isalpha():
-        question_keys = _check_question_keys(task)
-        if text.upper() in question_keys:
-            return orchestrator.answer_question(session, chosen_key=text.upper())
-
     if len(text) == 1 and text.isalpha():
-        matching = next((o for o in turn.menu if o.key == text.upper()), None)
+        key = text.upper()
+        if key in turn.question_keys:
+            return orchestrator.answer_question(session, chosen_key=key)
+        matching = next((o for o in turn.menu if o.key == key), None)
         if matching is not None:
             return _handle_menu_selection(
                 platform, session, task, matching, level=level, depth=depth
             )
+        if task is not None and key in _check_question_keys(task):
+            return orchestrator.answer_question(session, chosen_key=key)
 
     if task is not None and task.prediction is not None:
         return orchestrator.attempt_task(session, learner_response=text)
@@ -145,8 +146,9 @@ def _dispatch(
 
 
 def _check_question_keys(task: Task) -> set[str]:
+    """Answer keys usable once the question has scrolled off the current turn."""
     for block in task.content:
-        if block.question is not None:
+        if block.kind == ContentBlockKind.CHECK_QUESTION and block.question is not None:
             return {o.key for o in block.question.options}
     return set()
 
@@ -184,7 +186,30 @@ def _handle_menu_selection(
     if "plan" in label:
         return orchestrator.run_tool(session, tool_name="terraform", operation="plan")
     if "run it" in label:
-        orchestrator.run_tool(session, tool_name="docker", operation="build")
-        return orchestrator.run_tool(session, tool_name="docker", operation="run")
+        build = orchestrator.run_tool(session, tool_name="docker", operation="build")
+        run = orchestrator.run_tool(session, tool_name="docker", operation="run")
+        return TurnResult(
+            session=session,
+            heading=run.heading,
+            menu=run.menu,
+            status_message=f"{build.status_message}\n{run.status_message}",
+        )
+    if any(word in label for word in _ADVANCE_WORDS):
+        return orchestrator.advance(session, level=level, depth=depth)
 
-    return orchestrator.advance(session, level=level, depth=depth)
+    return TurnResult(
+        session=session,
+        heading=option.label,
+        menu=(option,) if not task else _menu_of(task, option),
+        status_message=(
+            "That option isn't wired up yet. Work on it yourself, ask for a 'hint', "
+            "or type 'continue' when you're ready to move on."
+        ),
+    )
+
+
+def _menu_of(task: Task, fallback: MenuOption) -> tuple[MenuOption, ...]:
+    for block in task.content:
+        if block.kind == ContentBlockKind.NEXT_STEP_MENU and block.menu_options:
+            return block.menu_options
+    return (fallback,)

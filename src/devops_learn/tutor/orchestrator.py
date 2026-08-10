@@ -17,7 +17,7 @@ rather than the orchestrator holding any of its own.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -54,6 +54,11 @@ from devops_learn.workflows.troubleshooting_flow import is_troubleshooting_task,
 
 _DEFAULT_MENU = (MenuOption("C", "Continue"),)
 
+_STALE_POINTER_NOTICE = (
+    "This project's content changed since your last session, so you have been "
+    "moved to the start of the nearest module."
+)
+
 
 @dataclass(frozen=True)
 class TurnResult:
@@ -64,6 +69,12 @@ class TurnResult:
     status_message: str | None = None
     prediction: PredictionPrompt | None = None
     is_terminal: bool = False
+    question_keys: tuple[str, ...] = ()
+    """Option keys of a check question displayed on this turn, if any.
+
+    The session loop resolves a single-letter input against these before the
+    menu, so a task offering both cannot make one of them unreachable.
+    """
 
 
 class TutorOrchestrator:
@@ -127,6 +138,10 @@ class TutorOrchestrator:
     def resume(
         self, session: LearningSession, *, level: AssistanceLevel, depth: ExplanationDepth
     ) -> TurnResult:
+        repaired = self._repair_stale_pointer(session)
+        if repaired is not None:
+            turn = self.resume(repaired, level=level, depth=depth)
+            return replace(turn, status_message=_STALE_POINTER_NOTICE)
         if session.current_task_id is None:
             assert session.current_lesson_id is not None
             lesson = self._curriculum.lesson(session.current_lesson_id)
@@ -160,12 +175,29 @@ class TutorOrchestrator:
             blocks=arranged.proactive,
             menu=menu,
             prediction=task.prediction,
+            question_keys=self._pending_question_keys(session, task, arranged.proactive),
         )
 
     def answer_question(self, session: LearningSession, *, chosen_key: str) -> TurnResult:
-        assert session.current_task_id is not None
-        task = self._curriculum.task(session.current_task_id)
+        task = self._current_task(session)
+        if task is None:
+            return self._no_task_turn(session, "There is no question on this screen.")
         question = self._find_question(task)
+        if question is None:
+            return TurnResult(
+                session=session,
+                heading=task.title,
+                menu=self._menu_for_task(task),
+                status_message="This task has no check question.",
+            )
+        if chosen_key not in {option.key for option in question.options}:
+            return TurnResult(
+                session=session,
+                heading=task.title,
+                menu=self._menu_for_task(task),
+                status_message=f"'{chosen_key}' is not one of the offered answers.",
+                question_keys=self._pending_question_keys(session, task),
+            )
         now = datetime.now(timezone.utc)
         event = self._journal.record(
             session_id=self._require_id(session),
@@ -185,15 +217,22 @@ class TutorOrchestrator:
             triggering_event_id=event.id,
             occurred_at=now,
         )
-        return TurnResult(session=session, heading=task.title, status_message=assessment.feedback)
+        return TurnResult(
+            session=session,
+            heading=task.title,
+            menu=self._menu_for_task(task),
+            status_message=assessment.feedback,
+        )
 
     def request_hint(self, session: LearningSession) -> TurnResult:
-        assert session.current_task_id is not None
-        task = self._curriculum.task(session.current_task_id)
+        task = self._current_task(session)
+        if task is None:
+            return self._no_task_turn(
+                session, "There is no task on this screen to hint on. Type 'continue' to move on."
+            )
 
-        if is_troubleshooting_task(task.id):
-            scenario = scenario_for_task(task.id)
-            assert scenario is not None
+        scenario = scenario_for_task(task.id) if is_troubleshooting_task(task.id) else None
+        if scenario is not None:
             attempt = self._attempt_tracker.get_or_start(
                 session_id=self._require_id(session), learner_id=session.learner_id, task_id=task.id
             )
@@ -208,13 +247,26 @@ class TutorOrchestrator:
             message = "No more hints available. Ask for the full explanation if you're stuck."
         else:
             message = f"HINT {hint.level}: {hint.text}"
-        return TurnResult(session=session, heading=task.title, status_message=message)
+        return TurnResult(
+            session=session,
+            heading=task.title,
+            menu=self._menu_for_task(task),
+            status_message=message,
+            question_keys=self._pending_question_keys(session, task),
+        )
 
     def submit_diagnosis(self, session: LearningSession, *, diagnosis_key: str) -> TurnResult:
-        assert session.current_task_id is not None
-        task = self._curriculum.task(session.current_task_id)
+        task = self._current_task(session)
+        if task is None:
+            return self._no_task_turn(session, "There is no failure to diagnose on this screen.")
         scenario = scenario_for_task(task.id)
-        assert scenario is not None, f"'{task.id}' is not a troubleshooting task"
+        if scenario is None:
+            return TurnResult(
+                session=session,
+                heading=task.title,
+                menu=self._menu_for_task(task),
+                status_message="This task is not a troubleshooting exercise.",
+            )
         attempt = self._attempt_tracker.get_or_start(
             session_id=self._require_id(session), learner_id=session.learner_id, task_id=task.id
         )
@@ -224,16 +276,28 @@ class TutorOrchestrator:
             message = f"Correct. {outcome.resolution.explanation}"
         else:
             message = "That doesn't match the evidence. Try again, or request a hint."
-        return TurnResult(session=session, heading=task.title, status_message=message)
+        return TurnResult(
+            session=session,
+            heading=task.title,
+            menu=self._menu_for_task(task),
+            status_message=message,
+        )
 
     def attempt_task(self, session: LearningSession, *, learner_response: str) -> TurnResult:
-        assert session.current_task_id is not None
-        task = self._curriculum.task(session.current_task_id)
+        task = self._current_task(session)
+        if task is None:
+            return self._no_task_turn(session, "There is no task on this screen to attempt.")
         assessment = self._assessment.assess_open_response(task, learner_response)
         message = assessment.feedback
         if task.prediction is not None:
             message += f"\n\nWhat actually happens: {task.prediction.outcome_summary}"
-        return TurnResult(session=session, heading=task.title, status_message=message)
+        return TurnResult(
+            session=session,
+            heading=task.title,
+            menu=self._menu_for_task(task),
+            status_message=message,
+            question_keys=self._pending_question_keys(session, task),
+        )
 
     def run_tool(
         self,
@@ -265,6 +329,10 @@ class TutorOrchestrator:
     def advance(
         self, session: LearningSession, *, level: AssistanceLevel, depth: ExplanationDepth
     ) -> TurnResult:
+        repaired = self._repair_stale_pointer(session)
+        if repaired is not None:
+            turn = self.resume(repaired, level=level, depth=depth)
+            return replace(turn, status_message=_STALE_POINTER_NOTICE)
         assert session.current_module_id is not None and session.current_lesson_id is not None
         old_module_id = session.current_module_id
         now = datetime.now(timezone.utc)
@@ -329,11 +397,77 @@ class TutorOrchestrator:
                 return block.menu_options
         return _DEFAULT_MENU
 
-    def _find_question(self, task: Task) -> ComprehensionQuestion:
+    def _menu_for_task(self, task: Task) -> tuple[MenuOption, ...]:
+        """A task's menu regardless of depth; NEXT_STEP_MENU blocks are always included."""
+        return self._extract_menu(task.content)
+
+    def _pending_question_keys(
+        self,
+        session: LearningSession,
+        task: Task,
+        displayed_blocks: tuple[ContentBlock, ...] | None = None,
+    ) -> tuple[str, ...]:
+        """Answer keys the next turn should route to the question rather than the menu.
+
+        Empty once the question has been answered in this session, so a task whose
+        question and menu share keys hands them back to the menu afterwards.
+        """
+        question = self._find_question(task)
+        if question is None:
+            return ()
+        if displayed_blocks is not None and not any(
+            block.kind == ContentBlockKind.CHECK_QUESTION for block in displayed_blocks
+        ):
+            return ()
+        if session.id is not None and self._journal.has_recorded(
+            session_id=session.id,
+            event_type=LearningEventType.QUESTION_ANSWERED,
+            task_id=task.id,
+        ):
+            return ()
+        return tuple(option.key for option in question.options)
+
+    def _current_task(self, session: LearningSession) -> Task | None:
+        return self._curriculum.find_task(session.current_task_id)
+
+    def _no_task_turn(self, session: LearningSession, message: str) -> TurnResult:
+        return TurnResult(session=session, heading="NO ACTIVE TASK", status_message=message)
+
+    def _repair_stale_pointer(self, session: LearningSession) -> LearningSession | None:
+        """Re-anchor a saved pointer that current curriculum content no longer contains.
+
+        Returns the repaired session, or None when the pointer is already valid.
+        Content ids are persisted, so renaming or removing a module, lesson or
+        task would otherwise leave every in-flight session unresumable.
+        """
+        module = self._curriculum.find_module(session.current_module_id)
+        lesson = self._curriculum.find_lesson(session.current_lesson_id)
+        task = self._curriculum.find_task(session.current_task_id)
+
+        lesson_belongs = lesson is not None and module is not None and lesson in module.lessons
+        task_missing = session.current_task_id is not None and task is None
+        task_belongs = task is None or (lesson is not None and task in lesson.tasks)
+        if module is not None and lesson_belongs and not task_missing and task_belongs:
+            return None
+
+        anchor_module = module if module is not None else self._curriculum.first_module()
+        anchor_lesson = (
+            lesson if lesson is not None and lesson in anchor_module.lessons
+            else anchor_module.lessons[0]
+        )
+        anchor_task = anchor_lesson.tasks[0] if anchor_lesson.tasks else None
+        return self._session.advance_pointer(
+            session,
+            module_id=anchor_module.id,
+            lesson_id=anchor_lesson.id,
+            task_id=anchor_task.id if anchor_task is not None else None,
+        )
+
+    def _find_question(self, task: Task) -> ComprehensionQuestion | None:
         for block in task.content:
             if block.kind == ContentBlockKind.CHECK_QUESTION and block.question is not None:
                 return block.question
-        raise ValueError(f"Task '{task.id}' has no check question")
+        return None
 
     def _require_id(self, session: LearningSession) -> int:
         assert session.id is not None

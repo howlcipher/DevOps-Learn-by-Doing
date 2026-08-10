@@ -51,6 +51,16 @@ class CurriculumService:
         except KeyError as exc:
             raise CurriculumError(f"Unknown task id: {task_id}") from exc
 
+    def find_module(self, module_id: str | None) -> Module | None:
+        """Non-raising lookup, for validating a persisted pointer against current content."""
+        return self._modules_by_id.get(module_id) if module_id else None
+
+    def find_lesson(self, lesson_id: str | None) -> Lesson | None:
+        return self._lessons_by_id.get(lesson_id) if lesson_id else None
+
+    def find_task(self, task_id: str | None) -> Task | None:
+        return self._tasks_by_id.get(task_id) if task_id else None
+
     def module_for_lesson(self, lesson_id: str) -> Module:
         try:
             return self._lesson_parent[lesson_id]
@@ -91,11 +101,15 @@ class CurriculumService:
 
         if task_id is not None:
             task_ids = [t.id for t in lesson.tasks]
+            if task_id not in task_ids:
+                raise CurriculumError(f"Task '{task_id}' does not belong to lesson '{lesson_id}'")
             index = task_ids.index(task_id)
             if index + 1 < len(task_ids):
                 return module, lesson, lesson.tasks[index + 1]
 
         lesson_ids = [lesson_.id for lesson_ in module.lessons]
+        if lesson_id not in lesson_ids:
+            raise CurriculumError(f"Lesson '{lesson_id}' does not belong to module '{module_id}'")
         lesson_index = lesson_ids.index(lesson_id)
         if lesson_index + 1 < len(lesson_ids):
             next_lesson = module.lessons[lesson_index + 1]

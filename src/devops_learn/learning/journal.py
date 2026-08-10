@@ -39,3 +39,11 @@ class LearningJournal:
             payload=payload or {},
         )
         return self._event_repository.append(event)
+
+    def has_recorded(
+        self, *, session_id: int, event_type: LearningEventType, task_id: str
+    ) -> bool:
+        return any(
+            event.event_type is event_type and event.task_id == task_id
+            for event in self._event_repository.list_for_session(session_id)
+        )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from typing import Mapping, TypeVar
 
 from devops_learn.cli.session_loop import run_interactive_session
 from devops_learn.domain.enums import (
@@ -14,6 +15,8 @@ from devops_learn.domain.enums import (
 )
 from devops_learn.domain.learner_models import LearnerProfile
 from devops_learn.tutor.bootstrap import Platform
+
+T = TypeVar("T")
 
 _ASSISTANCE_OPTIONS = {
     "1": AssistanceLevel.GUIDED,
@@ -27,6 +30,25 @@ _DEPTH_OPTIONS = {
     "3": ExplanationDepth.LEARNING,
     "4": ExplanationDepth.DEEP,
 }
+_QUIT_COMMANDS = {"quit", "exit"}
+
+
+class _OnboardingAborted(Exception):
+    """The learner ended onboarding with quit or end-of-input, before any profile exists."""
+
+
+def _choose(options: Mapping[str, T], retry_message: str) -> T:
+    """Prompt until a valid key is given. Quit or EOF aborts instead of looping forever."""
+    while True:
+        try:
+            choice = input("> ").strip()
+        except EOFError as exc:
+            raise _OnboardingAborted from exc
+        if choice.lower() in _QUIT_COMMANDS:
+            raise _OnboardingAborted
+        if choice in options:
+            return options[choice]
+        print(retry_message)
 
 
 def register(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
@@ -46,10 +68,15 @@ def run(args: argparse.Namespace, platform: Platform) -> None:
     print("Learn modern DevOps by building and operating real systems.")
     print()
 
-    cloud = _choose_cloud()
-    language = _choose_language()
-    assistance = _choose_assistance()
-    depth = _choose_depth()
+    try:
+        cloud = _choose_cloud()
+        language = _choose_language()
+        assistance = _choose_assistance()
+        depth = _choose_depth()
+    except _OnboardingAborted:
+        print()
+        print("Setup cancelled. Nothing was saved.")
+        return
 
     now = datetime.now(timezone.utc)
     profile = platform.profile_repository.create(
@@ -81,10 +108,10 @@ def _choose_cloud() -> CloudProviderKind:
     print("2. AWS [coming soon]")
     print("3. GCP [coming soon]")
     print()
-    while True:
-        if input("> ").strip() == "1":
-            return CloudProviderKind.AZURE
-        print("AWS and GCP are not implemented yet. Please choose 1 (Azure).")
+    return _choose(
+        {"1": CloudProviderKind.AZURE},
+        "AWS and GCP are not implemented yet. Please choose 1 (Azure).",
+    )
 
 
 def _choose_language() -> LanguageTrackKind:
@@ -94,10 +121,10 @@ def _choose_language() -> LanguageTrackKind:
     print("1. Python")
     print("2. Go [coming soon]")
     print()
-    while True:
-        if input("> ").strip() == "1":
-            return LanguageTrackKind.PYTHON
-        print("Go is not implemented yet. Please choose 1 (Python).")
+    return _choose(
+        {"1": LanguageTrackKind.PYTHON},
+        "Go is not implemented yet. Please choose 1 (Python).",
+    )
 
 
 def _choose_assistance() -> AssistanceLevel:
@@ -107,11 +134,7 @@ def _choose_assistance() -> AssistanceLevel:
     for key, level in _ASSISTANCE_OPTIONS.items():
         print(f"{key}. {level.name.title()}")
     print()
-    while True:
-        choice = input("> ").strip()
-        if choice in _ASSISTANCE_OPTIONS:
-            return _ASSISTANCE_OPTIONS[choice]
-        print("Please choose 1-4.")
+    return _choose(_ASSISTANCE_OPTIONS, "Please choose 1-4.")
 
 
 def _choose_depth() -> ExplanationDepth:
@@ -121,8 +144,4 @@ def _choose_depth() -> ExplanationDepth:
     for key, depth in _DEPTH_OPTIONS.items():
         print(f"{key}. {depth.name.title()}")
     print()
-    while True:
-        choice = input("> ").strip()
-        if choice in _DEPTH_OPTIONS:
-            return _DEPTH_OPTIONS[choice]
-        print("Please choose 1-4.")
+    return _choose(_DEPTH_OPTIONS, "Please choose 1-4.")
