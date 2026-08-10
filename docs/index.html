@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="DevOps Learn by Doing is a simulation-first CLI that teaches DevOps through a production-style Python API project with progressive AI assistance.">
+  <title>DevOps Learn by Doing</title>
+  <style>
+    :root {
+      --ink: #0b1020;
+      --ink-2: #111a2f;
+      --panel: #d7d9cf;
+      --panel-hi: #f2f3ed;
+      --panel-lo: #8d938e;
+      --text: #ecf4ed;
+      --muted: #a8b6b0;
+      --cyan: #63e6e2;
+      --amber: #ffd166;
+      --green: #7ee787;
+      --red: #ff7b72;
+      --blue: #75a7ff;
+      --shadow: #050814;
+      --pixel: 4px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        var(--ink);
+      background-size: 8px 8px;
+      font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      line-height: 1.65;
+    }
+
+    body::before {
+      content: "";
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      opacity: .08;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0,
+        transparent 3px,
+        #000 3px,
+        #000 4px
+      );
+    }
+
+    a { color: inherit; }
+
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -80px;
+      z-index: 1000;
+      padding: 10px 14px;
+      background: var(--amber);
+      color: #151515;
+      font-weight: 700;
+    }
+
+    .skip-link:focus { top: 12px; }
+
+    .shell {
+      width: min(1120px, calc(100% - 28px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: var(--pixel) solid #060914;
+      background: rgba(11, 16, 32, .96);
+      backdrop-filter: blur(10px);
+    }
+
+    .nav {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      font-weight: 900;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 2px;
+    }
+
+    .brand-mark i { background: var(--cyan); }
+    .brand-mark i:nth-child(2),
+    .brand-mark i:nth-child(4),
+    .brand-mark i:nth-child(8) { opacity: .28; }
+    .brand-mark i:nth-child(6) { background: var(--amber); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: .82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .nav-links a:hover,
+    .nav-links a:focus-visible { color: var(--cyan); }
+
+    :focus-visible {
+      outline: 3px solid var(--amber);
+      outline-offset: 4px;
+    }
+
+    main { overflow: hidden; }
+
+    .hero {
+      min-height: 76vh;
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap: 46px;
+      align-items: center;
+      padding: 86px 0 72px;
+    }
+
+    .eyebrow,
+    .label {
+      color: var(--cyan);
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-size: .8rem;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 780px;
+      margin-bottom: 22px;
+      font-size: clamp(2.4rem, 7vw, 5.7rem);
+      line-height: .95;
+      letter-spacing: -.055em;
+      text-transform: uppercase;
+      text-shadow: 5px 5px 0 #050814;
+    }
+
+    .hero-copy > p {
+      max-width: 700px;
+      color: #c9d5d0;
+      font-size: clamp(1rem, 2vw, 1.16rem);
+    }
+
+    .hero strong { color: var(--amber); }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 12px 16px;
+      border: 3px solid #050814;
+      box-shadow: 5px 5px 0 #050814;
+      background: var(--cyan);
+      color: #091018;
+      text-decoration: none;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+
+    .button.secondary { background: var(--panel); }
+    .button:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 #050814; }
+
+    .window {
+      border: 4px solid #060914;
+      box-shadow: 9px 9px 0 #050814;
+      background: #c4c7bf;
+      color: #111722;
+    }
+
+    .window-bar {
+      min-height: 38px;
+      padding: 7px 9px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--blue);
+      border-bottom: 4px solid #060914;
+      color: #07101c;
+      font-size: .78rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .window-controls { display: flex; gap: 6px; }
+    .window-controls span {
+      width: 13px;
+      height: 13px;
+      display: block;
+      border: 2px solid #07101c;
+      background: var(--panel-hi);
+    }
+
+    .terminal {
+      padding: 20px;
+      min-height: 360px;
+      background: #07110d;
+      color: #9ff4aa;
+      overflow: auto;
+      font-size: .9rem;
+    }
+
+    .terminal p { margin: 0 0 10px; }
+    .terminal .dim { color: #6fa778; }
+    .terminal .warn { color: var(--amber); }
+    .terminal .info { color: var(--cyan); }
+    .terminal .cursor {
+      display: inline-block;
+      width: .65em;
+      height: 1em;
+      vertical-align: -.14em;
+      background: #9ff4aa;
+      animation: blink 1.05s steps(1) infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    section { padding: 78px 0; }
+
+    .section-head {
+      max-width: 780px;
+      margin-bottom: 34px;
+    }
+
+    h2 {
+      margin-bottom: 14px;
+      font-size: clamp(1.85rem, 4vw, 3.25rem);
+      line-height: 1.05;
+      text-transform: uppercase;
+      letter-spacing: -.035em;
+    }
+
+    .section-head p { color: var(--muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      min-height: 100%;
+      padding: 24px;
+      border: 3px solid #050814;
+      box-shadow: 6px 6px 0 #050814;
+      background: var(--ink-2);
+    }
+
+    .card h3 {
+      margin-bottom: 10px;
+      color: var(--amber);
+      font-size: 1rem;
+      text-transform: uppercase;
+    }
+
+    .card p,
+    .card li { color: #bac7c2; font-size: .92rem; }
+
+    .card ul { padding-left: 18px; margin-bottom: 0; }
+
+    .levels {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .level {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .level::after {
+      content: attr(data-level);
+      position: absolute;
+      right: 10px;
+      bottom: -10px;
+      color: rgba(255,255,255,.045);
+      font-size: 4.5rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      align-items: center;
+    }
+
+    .flow span {
+      padding: 8px 10px;
+      border: 2px solid #050814;
+      background: var(--panel);
+      color: #111722;
+      font-size: .78rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      box-shadow: 3px 3px 0 #050814;
+    }
+
+    .flow b { color: var(--cyan); }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+    }
+
+    .status-list {
+      display: grid;
+      gap: 12px;
+      margin: 18px 0 0;
+    }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: 84px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 12px;
+      border: 2px solid #050814;
+      background: #111927;
+    }
+
+    .badge {
+      padding: 4px 7px;
+      text-align: center;
+      border: 2px solid #050814;
+      color: #0a1018;
+      font-size: .7rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .badge.real { background: var(--green); }
+    .badge.sim { background: var(--amber); }
+    .status-row p { margin: 0; color: #c1ccc8; font-size: .86rem; }
+
+    .roadmap { counter-reset: step; }
+    .roadmap .card { position: relative; padding-top: 66px; }
+    .roadmap .card::before {
+      counter-increment: step;
+      content: "0" counter(step);
+      position: absolute;
+      top: 18px;
+      left: 22px;
+      color: var(--cyan);
+      font-weight: 900;
+      font-size: 1.8rem;
+    }
+
+    .quickstart {
+      padding: 0 0 88px;
+    }
+
+    .quickstart .window { max-width: 900px; margin: 0 auto; }
+    .quickstart .terminal { min-height: 0; }
+
+    code { color: var(--cyan); }
+
+    footer {
+      border-top: 4px solid #050814;
+      background: #070b16;
+      padding: 30px 0 40px;
+      color: var(--muted);
+      font-size: .82rem;
+    }
+
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .footer-row a { color: var(--cyan); text-decoration: none; }
+
+    @media (max-width: 900px) {
+      .hero,
+      .split { grid-template-columns: 1fr; }
+      .hero { min-height: auto; padding-top: 64px; }
+      .grid { grid-template-columns: 1fr 1fr; }
+      .levels { grid-template-columns: 1fr 1fr; }
+      .nav-links a:not(.repo-link) { display: none; }
+    }
+
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 20px, 1120px); }
+      .topbar { position: static; }
+      .nav { min-height: 58px; }
+      .brand { font-size: .78rem; }
+      .nav-links { font-size: .72rem; }
+      .hero { padding: 54px 0 44px; gap: 28px; }
+      h1 { font-size: clamp(2.35rem, 16vw, 4rem); }
+      section { padding: 56px 0; }
+      .grid,
+      .levels { grid-template-columns: 1fr; }
+      .card { padding: 20px; }
+      .terminal { padding: 15px; font-size: .78rem; min-height: 320px; }
+      .window { box-shadow: 6px 6px 0 #050814; }
+      .status-row { grid-template-columns: 72px 1fr; }
+      .button { width: 100%; text-align: center; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .terminal .cursor { animation: none; }
+      .button:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="shell nav">
+      <a class="brand" href="#top" aria-label="DevOps Learn by Doing home">
+        <span class="brand-mark" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </span>
+        DevOps Learn by Doing
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#model">Learning model</a>
+        <a href="#status">V1 status</a>
+        <a href="#roadmap">Roadmap</a>
+        <a class="repo-link" href="https://github.com/howlcipher/DevOps-Learn-by-Doing">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="shell hero" id="top">
+      <div class="hero-copy">
+        <div class="eyebrow">Systems Training Division // V1 Skeleton</div>
+        <h1>Learn DevOps by doing the work.</h1>
+        <p>
+          A CLI learning platform built around a real production-style Python API project.
+          The AI mentor <strong>explains, hints, reviews, then gets out of your way</strong>
+          so progress means you can actually perform the work—not just watch it happen.
+        </p>
+        <div class="actions">
+          <a class="button" href="https://github.com/howlcipher/DevOps-Learn-by-Doing">View source ↗</a>
+          <a class="button secondary" href="https://github.com/howlcipher/DevOps-Learn-by-Doing/blob/main/docs/learning-model.md">Read the learning model ↗</a>
+        </div>
+      </div>
+
+      <div class="window" aria-label="Project status terminal">
+        <div class="window-bar">
+          <span>DEVOPS_TRAINING.EXE</span>
+          <span class="window-controls" aria-hidden="true"><span></span><span></span><span></span></span>
+        </div>
+        <div class="terminal">
+          <p><span class="dim">C:\LEARN&gt;</span> devops-learn start --simulation</p>
+          <p class="info">[SYSTEM] Production-Style API Platform</p>
+          <p>[LANG] Python</p>
+          <p>[CLOUD] Azure <span class="warn">(simulated)</span></p>
+          <p>[MODE] Progressive assistance enabled</p>
+          <p>[TRACK] Git → Tests → Docker → CI/CD → Terraform</p>
+          <p class="dim">        → Azure → Kubernetes → Observability</p>
+          <p class="dim">        → Failure → Troubleshoot → Rollback</p>
+          <p>[GOAL] Demonstrate competency without hints</p>
+          <p class="info">[READY] No cloud credentials required.</p>
+          <p><span class="dim">C:\LEARN&gt;</span> <span class="cursor" aria-hidden="true"></span></p>
+        </div>
+      </div>
+    </div>
+
+    <section id="model">
+      <div class="shell">
+        <div class="section-head">
+          <div class="label">01 // Learning model</div>
+          <h2>AI assistance should fade as skill grows.</h2>
+          <p>
+            The system is designed around independence: show, explain, help, hint, review,
+            then let the learner perform the task without assistance.
+          </p>
+        </div>
+
+        <div class="grid levels">
+          <article class="card level" data-level="1">
+            <h3>Guided</h3>
+            <p>WHY, WHAT, and HOW are shown proactively. The learner sees the full shape of the task.</p>
+          </article>
+          <article class="card level" data-level="2">
+            <h3>Assisted</h3>
+            <p>WHY and WHAT stay visible. HOW is withheld until the learner asks or needs a hint.</p>
+          </article>
+          <article class="card level" data-level="3">
+            <h3>Challenge</h3>
+            <p>The learner predicts first, performs more independently, and earns deeper help through hints.</p>
+          </article>
+          <article class="card level" data-level="4">
+            <h3>Independent</h3>
+            <p>Minimal proactive content. Demonstrated competency requires a successful unhinted attempt.</p>
+          </article>
+        </div>
+
+        <div style="margin-top:30px">
+          <div class="flow" aria-label="Learn by doing loop">
+            <span>Introduce</span><b>→</b>
+            <span>Explain</span><b>→</b>
+            <span>Predict</span><b>→</b>
+            <span>Perform</span><b>→</b>
+            <span>Validate</span><b>→</b>
+            <span>Explain result</span><b>→</b>
+            <span>Challenge</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="shell">
+        <div class="section-head">
+          <div class="label">02 // Training path</div>
+          <h2>One project. A full DevOps journey.</h2>
+          <p>
+            V1 follows a production-style API platform from local development through delivery,
+            infrastructure concepts, operations, failure recovery, and architecture review.
+          </p>
+        </div>
+        <div class="flow">
+          <span>FastAPI</span><b>→</b>
+          <span>Git</span><b>→</b>
+          <span>Tests</span><b>→</b>
+          <span>Docker</span><b>→</b>
+          <span>GitHub Actions</span><b>→</b>
+          <span>Terraform</span><b>→</b>
+          <span>Azure networking</span><b>→</b>
+          <span>Kubernetes</span><b>→</b>
+          <span>Identity + secrets</span><b>→</b>
+          <span>Observability</span><b>→</b>
+          <span>Deploy</span><b>→</b>
+          <span>Break it</span><b>→</b>
+          <span>Troubleshoot</span><b>→</b>
+          <span>Rollback</span><b>→</b>
+          <span>Architecture review</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="status">
+      <div class="shell split">
+        <div>
+          <div class="section-head">
+            <div class="label">03 // Truthful V1 status</div>
+            <h2>Real learning target. Simulated infrastructure execution.</h2>
+            <p>
+              The boundary is deliberate. V1 teaches the concepts and workflow without pretending
+              it is already a live cloud automation platform.
+            </p>
+          </div>
+
+          <div class="status-list">
+            <div class="status-row">
+              <span class="badge real">Real</span>
+              <p>The demo FastAPI application and its tests are runnable code.</p>
+            </div>
+            <div class="status-row">
+              <span class="badge real">Real</span>
+              <p>Reference Dockerfile, Terraform, Kubernetes, and GitHub Actions configurations are valid examples.</p>
+            </div>
+            <div class="status-row">
+              <span class="badge real">Real</span>
+              <p>SQLite persistence, learning history, competency tracking, and resume state are implemented.</p>
+            </div>
+            <div class="status-row">
+              <span class="badge sim">Sim</span>
+              <p>Docker, Terraform, kubectl, cloud API calls, and even Git operations are simulated in V1.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns:1fr">
+          <article class="card">
+            <h3>Controlled execution</h3>
+            <p>
+              The AI provider cannot invoke tools directly. <code>ToolService.invoke</code> is the single controlled entry point,
+              with risk metadata and approval gating built into the tool model.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Architecture</h3>
+            <p>
+              A modular monolith, not an agent swarm: explicit service boundaries, constructor injection,
+              plain domain models, and SQLite persistence with SQL isolated behind repositories.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Extension points</h3>
+            <p>
+              Azure and Python are the implemented V1 path. AWS, GCP, and Go have typed extension points,
+              but their curricula are intentionally not claimed as complete yet.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <div class="shell">
+        <div class="section-head">
+          <div class="label">04 // Roadmap</div>
+          <h2>Move from simulation to real execution in controlled steps.</h2>
+          <p>The next milestones keep the existing safety boundary and replace simulated tools one layer at a time.</p>
+        </div>
+        <div class="grid roadmap">
+          <article class="card">
+            <h3>Real Python + Docker</h3>
+            <p>Run pytest, flake8, and the local Docker daemon through narrow allow-listed subprocess wrappers.</p>
+          </article>
+          <article class="card">
+            <h3>Real Terraform validation</h3>
+            <p>Use the Terraform binary for validate/plan while Azure apply/destroy remains simulated.</p>
+          </article>
+          <article class="card">
+            <h3>First real Azure path</h3>
+            <p>Provision learner-owned Azure resources behind approval gates, then extend into real Kubernetes fundamentals.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="quickstart">
+      <div class="shell">
+        <div class="window">
+          <div class="window-bar">
+            <span>QUICKSTART.BAT</span>
+            <span class="window-controls" aria-hidden="true"><span></span><span></span><span></span></span>
+          </div>
+          <div class="terminal">
+            <p><span class="dim"># install the project and development dependencies</span></p>
+            <p>pip install -e ".[dev]"</p>
+            <br>
+            <p><span class="dim"># start the simulation-first learning experience</span></p>
+            <p>devops-learn start --simulation</p>
+            <br>
+            <p class="info">Other commands: resume · progress · projects · competencies · explain</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-row">
+      <span>DEVOPS LEARN BY DOING // SIMULATION-FIRST V1</span>
+      <span>
+        <a href="https://github.com/howlcipher/DevOps-Learn-by-Doing">Repository</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/howlcipher/DevOps-Learn-by-Doing/tree/main/docs">Documentation</a>
+      </span>
+    </div>
+  </footer>
+</body>
+</html>
