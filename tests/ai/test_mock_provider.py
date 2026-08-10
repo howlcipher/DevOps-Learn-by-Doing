@@ -21,6 +21,15 @@ def test_explain_topic_is_deterministic() -> None:
     assert first.title == "Dockerfiles"
 
 
+def test_explain_architecture_keeps_the_requested_topic_as_the_title() -> None:
+    provider = MockLLMProvider()
+
+    explanation = provider.explain_architecture("Ingress")
+
+    assert explanation.title == "Ingress"
+    assert "Ingress" in explanation.body
+
+
 def test_assess_open_response_never_grades_predictions_right_or_wrong() -> None:
     provider = MockLLMProvider()
     assessment = provider.assess_open_response(_task(), "It will use the cache.")

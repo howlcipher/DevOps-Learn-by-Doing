@@ -22,12 +22,16 @@ def test_azure_managed_kubernetes_maps_to_aks() -> None:
     assert "AKS" in provider.service_name_for(CloudConcept.MANAGED_KUBERNETES)
 
 
-@pytest.mark.parametrize("provider_cls", [AWSProvider, GCPProvider])
+@pytest.mark.parametrize(
+    ("provider_cls", "kind"),
+    [(AWSProvider, CloudProviderKind.AWS), (GCPProvider, CloudProviderKind.GCP)],
+)
 def test_unavailable_providers_declare_themselves_and_raise_coming_soon(
-    provider_cls: type,
+    provider_cls: type, kind: CloudProviderKind
 ) -> None:
     provider = provider_cls()
     assert provider.is_available is False
+    assert provider.kind == kind
     with pytest.raises(ComingSoonError):
         provider.service_name_for(CloudConcept.MANAGED_KUBERNETES)
     with pytest.raises(ComingSoonError):

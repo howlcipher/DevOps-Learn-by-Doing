@@ -1,5 +1,6 @@
+import dataclasses
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from devops_learn.domain.attempt_models import HintUsage, TaskAttempt
 from devops_learn.domain.competency_models import CompetencyTransition, LearnerCompetency
@@ -33,6 +34,7 @@ from devops_learn.learning.persistence.repositories.task_attempt_repository impo
 )
 
 NOW = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
+LATER = NOW + timedelta(hours=1)
 
 
 def _make_profile() -> LearnerProfile:
@@ -53,6 +55,52 @@ def test_learner_profile_round_trips(conn: sqlite3.Connection) -> None:
     assert created.id is not None
     fetched = repo.get(created.id)
     assert fetched == created
+
+
+def test_learner_profile_get_and_latest_handle_an_empty_table(conn: sqlite3.Connection) -> None:
+    repo = LearnerProfileRepository(conn)
+    assert repo.get(1) is None
+    assert repo.latest() is None
+
+
+def test_learner_profile_latest_returns_the_most_recently_created(
+    conn: sqlite3.Connection,
+) -> None:
+    repo = LearnerProfileRepository(conn)
+    repo.create(_make_profile())
+    newest = repo.create(
+        dataclasses.replace(_make_profile(), display_name="Learner Two")
+    )
+
+    latest = repo.latest()
+
+    assert latest is not None
+    assert latest.id == newest.id
+    assert latest.display_name == "Learner Two"
+
+
+def test_learner_profile_update_persists_changed_preferences(conn: sqlite3.Connection) -> None:
+    repo = LearnerProfileRepository(conn)
+    created = repo.create(_make_profile())
+    assert created.id is not None
+
+    repo.update(
+        dataclasses.replace(
+            created,
+            display_name="Renamed",
+            assistance_level=AssistanceLevel.INDEPENDENT,
+            explanation_depth=ExplanationDepth.BRIEF,
+            updated_at=LATER,
+        )
+    )
+
+    reloaded = repo.get(created.id)
+    assert reloaded is not None
+    assert reloaded.display_name == "Renamed"
+    assert reloaded.assistance_level == AssistanceLevel.INDEPENDENT
+    assert reloaded.explanation_depth == ExplanationDepth.BRIEF
+    assert reloaded.updated_at == LATER
+    assert reloaded.created_at == NOW
 
 
 def test_session_created_and_resumable_by_pointer(conn: sqlite3.Connection) -> None:

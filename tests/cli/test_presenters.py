@@ -8,6 +8,7 @@ from devops_learn.domain.content import (
     ComprehensionQuestion,
     ContentBlock,
     MenuOption,
+    PredictionPrompt,
 )
 from devops_learn.domain.enums import ContentBlockKind, SessionStatus
 from devops_learn.domain.learner_models import LearningSession
@@ -63,6 +64,55 @@ def test_render_turn_prints_why_what_and_question_headers(
     assert "A. It encrypts requests" in output
     assert "OPTIONS" in output
     assert "A. Inspect the app" in output
+
+
+def test_render_turn_prompts_for_a_prediction_before_the_status_message(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    turn = TurnResult(
+        session=_session(),
+        heading="Containerize",
+        prediction=PredictionPrompt(
+            prompt="What happens when you build without a .dockerignore?",
+            outcome_summary="The build context includes .git and is slower.",
+        ),
+        status_message="Waiting on your prediction.",
+    )
+
+    render_turn(turn)
+    output = capsys.readouterr().out
+
+    assert "PREDICTION" in output
+    assert "What happens when you build without a .dockerignore?" in output
+    assert "(type your prediction and press enter)" in output
+    assert output.index("PREDICTION") < output.index("Waiting on your prediction.")
+    # The outcome is never leaked before the learner answers.
+    assert "includes .git" not in output
+
+
+def test_render_turn_does_not_print_menu_blocks_twice(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    turn = TurnResult(
+        session=_session(),
+        heading="Containerize",
+        blocks=(
+            ContentBlock(
+                kind=ContentBlockKind.NEXT_STEP_MENU,
+                text="never rendered inline",
+                menu_options=(MenuOption("A", "Write the Dockerfile"),),
+            ),
+            ContentBlock(kind=ContentBlockKind.HOW, text="docker build -t app ."),
+        ),
+        menu=(MenuOption("A", "Write the Dockerfile"),),
+    )
+
+    render_turn(turn)
+    output = capsys.readouterr().out
+
+    assert "never rendered inline" not in output
+    assert output.count("A. Write the Dockerfile") == 1
+    assert "docker build -t app ." in output
 
 
 def test_render_turn_marks_terminal_sessions(capsys: pytest.CaptureFixture[str]) -> None:

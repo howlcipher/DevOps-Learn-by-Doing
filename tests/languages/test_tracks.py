@@ -17,6 +17,7 @@ def test_python_track_is_available_and_describes_the_demo_app() -> None:
 def test_go_track_declares_itself_unavailable_and_raises_coming_soon() -> None:
     track = GoTrack()
     assert track.is_available is False
+    assert track.kind == LanguageTrackKind.GO
     with pytest.raises(ComingSoonError):
         track.demo_app_summary()
     with pytest.raises(ComingSoonError):
