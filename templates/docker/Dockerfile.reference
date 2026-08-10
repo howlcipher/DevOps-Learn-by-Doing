@@ -1,0 +1,25 @@
+# Reference Dockerfile for a small FastAPI service. Shown by the "show me an
+# example" hint in module_02_containerize; not executed by any tool in V1.
+
+# A slim, pinned base image: smaller attack surface, faster pulls.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# A non-root user: basic container security, matters once this image is
+# pulled by anything other than your own machine.
+RUN useradd --create-home appuser
+
+# Dependencies copied and installed before the rest of the source, so an
+# unrelated code change does not invalidate this layer's build cache.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+
+USER appuser
+
+# Documents the port the application listens on; does not by itself publish it.
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

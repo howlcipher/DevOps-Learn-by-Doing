@@ -1,0 +1,25 @@
+# Reference CI workflow for the learner's own api_platform project (distinct
+# from this repository's own .github/workflows/ci.yml). Not run by anything
+# in V1; shown as an example once the curriculum reaches the CI_CD module.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -r requirements.txt httpx pytest
+      - name: Test
+        run: pytest
+      - name: Build image
+        run: docker build -t api-platform:${{ github.sha }} .

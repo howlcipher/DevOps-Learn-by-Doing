@@ -1,0 +1,59 @@
+# Reference Terraform configuration for module_04_terraform_plan.
+#
+# SimulatedTerraformTool.plan() counts the `resource "..."` blocks in this
+# file to compute its simulated plan output, instead of a hardcoded number,
+# so the learner's interpretation question stays meaningful. Not applied by
+# any tool in V1; see docs/adr/0003-simulation-first.md.
+
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {}
+}
+
+variable "project_name" {
+  description = "Short name used to prefix every resource this configuration creates."
+  type        = string
+  default     = "api-platform"
+}
+
+variable "location" {
+  description = "Azure region to create resources in."
+  type        = string
+  default     = "eastus"
+}
+
+resource "azurerm_resource_group" "main" {
+  name     = "${var.project_name}-rg"
+  location = var.location
+}
+
+resource "azurerm_container_registry" "main" {
+  name                = "${var.project_name}acr"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  sku                 = "Basic"
+}
+
+resource "azurerm_log_analytics_workspace" "main" {
+  name                = "${var.project_name}-logs"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+output "resource_group_name" {
+  value = azurerm_resource_group.main.name
+}
+
+output "container_registry_login_server" {
+  value = azurerm_container_registry.main.login_server
+}
