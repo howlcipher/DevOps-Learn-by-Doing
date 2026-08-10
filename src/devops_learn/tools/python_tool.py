@@ -5,7 +5,13 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from devops_learn.tools.approval import ApprovalRecord
-from devops_learn.tools.base import RiskLevel, Tool, ToolOperationSpec, ToolResult
+from devops_learn.tools.base import (
+    RiskLevel,
+    Tool,
+    ToolOperationSpec,
+    ToolResult,
+    ensure_approved,
+)
 
 _OPERATIONS = (
     ToolOperationSpec(
@@ -43,11 +49,7 @@ class SimulatedPythonTool(Tool):
         approval: ApprovalRecord | None,
     ) -> ToolResult:
         spec = self.spec_for(operation)
-        assert (
-            not spec.requires_approval
-            or dry_run
-            or (approval is not None and approval.granted)
-        )
+        ensure_approved(self.name, spec, dry_run=dry_run, approval=approval)
 
         if operation == "run_tests":
             summary = "3 passed in 0.04s (simulated)"

@@ -13,7 +13,18 @@ from typing import Any, Mapping
 
 from devops_learn.tools.approval import ApprovalRecord, RiskLevel
 
-__all__ = ["RiskLevel", "ToolOperationSpec", "ToolResult", "Tool"]
+__all__ = [
+    "RiskLevel",
+    "ToolOperationSpec",
+    "ToolResult",
+    "Tool",
+    "ApprovalNotGrantedError",
+    "ensure_approved",
+]
+
+
+class ApprovalNotGrantedError(RuntimeError):
+    """An operation requiring approval reached execution without a granted approval."""
 
 
 @dataclass(frozen=True)
@@ -72,3 +83,25 @@ class Tool(ABC):
             if spec.name == operation:
                 return spec
         raise KeyError(f"{self.name} has no operation '{operation}'")
+
+
+def ensure_approved(
+    tool_name: str,
+    spec: ToolOperationSpec,
+    *,
+    dry_run: bool,
+    approval: ApprovalRecord | None,
+) -> None:
+    """Enforces the approval invariant at the moment of execution.
+
+    Raises rather than asserts: assert statements are stripped under
+    `python -O`, which would silently disable the approval gate in exactly
+    the environments where it matters most.
+    """
+    if not spec.requires_approval or dry_run:
+        return
+    if approval is None or not approval.granted:
+        raise ApprovalNotGrantedError(
+            f"'{tool_name}.{spec.name}' requires human approval but none was granted; "
+            "tools must be invoked through ToolService.invoke."
+        )

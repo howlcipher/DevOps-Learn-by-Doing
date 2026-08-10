@@ -17,6 +17,12 @@ spec:
       labels:
         app: api-platform
     spec:
+      # Pod-level identity: the image already builds a non-root user, and this
+      # makes the cluster refuse to start it if that ever regresses.
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api-platform
           image: api-platform:latest
@@ -25,6 +31,22 @@ spec:
           env:
             - name: ENVIRONMENT
               value: "production"
+          # Least privilege for the container process: no privilege escalation,
+          # no Linux capabilities, and an immutable root filesystem.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          # Requests drive scheduling; limits stop one workload starving the node.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           readinessProbe:
             httpGet:
               path: /health
