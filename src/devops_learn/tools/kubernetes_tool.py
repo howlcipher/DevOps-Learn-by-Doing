@@ -71,11 +71,7 @@ class SimulatedKubernetesTool(Tool):
         approval: ApprovalRecord | None,
     ) -> ToolResult:
         spec = self.spec_for(operation)
-        assert (
-            not spec.requires_approval
-            or dry_run
-            or (approval is not None and approval.granted)
-        )
+        assert not spec.requires_approval or dry_run or (approval is not None and approval.granted)
 
         details: dict[str, Any] = {}
         if operation == "get_pods":
@@ -86,13 +82,13 @@ class SimulatedKubernetesTool(Tool):
         elif operation == "logs":
             summary = "INFO: Uvicorn running on http://0.0.0.0:8000 (simulated)"
         elif operation == "rollout_status":
-            summary = "deployment \"api-platform\" successfully rolled out (simulated)"
+            summary = 'deployment "api-platform" successfully rolled out (simulated)'
         elif operation == "rollback":
             summary = "Rolled back to revision 1 (simulated)"
             details = {"revision": 1}
         else:  # delete_namespace
             namespace = params.get("namespace", "api-platform")
-            summary = f"namespace \"{namespace}\" deleted (simulated)"
+            summary = f'namespace "{namespace}" deleted (simulated)'
             details = {"namespace": namespace}
 
         return ToolResult(

@@ -86,11 +86,7 @@ class SimulatedTerraformTool(Tool):
         approval: ApprovalRecord | None,
     ) -> ToolResult:
         spec = self.spec_for(operation)
-        assert (
-            not spec.requires_approval
-            or dry_run
-            or (approval is not None and approval.granted)
-        )
+        assert not spec.requires_approval or dry_run or (approval is not None and approval.granted)
 
         details: dict[str, Any] = {}
         if operation == "fmt":
@@ -99,8 +95,18 @@ class SimulatedTerraformTool(Tool):
             summary = "Success! The configuration is valid. (simulated)"
         elif operation == "plan":
             create_count = _count_declared_resources()
-            summary = f"Plan: {create_count} to add, 0 to change, 0 to destroy. (simulated)"
-            details = {"create": create_count, "change": 0, "destroy": 0}
+            replace_count = int(params.get("simulate_replace", 0))
+            create_count = max(create_count - replace_count, 0)
+            summary = (
+                f"Plan: {create_count} to add, 0 to change, {replace_count} to replace, "
+                "0 to destroy. (simulated)"
+            )
+            details = {
+                "create": create_count,
+                "change": 0,
+                "replace": replace_count,
+                "destroy": 0,
+            }
         elif operation == "apply_approved_plan":
             create_count = _count_declared_resources()
             summary = (

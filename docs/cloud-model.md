@@ -1,10 +1,10 @@
 # Cloud model
 
-See docs/adr/0006-concept-first-multi-cloud.md for the full rationale.
+See docs/adr/0005-concept-first-multi-cloud.md for the full rationale.
 
 ## Concept first
 
-The curriculum and the learner reason in terms of `CloudConcept` (`cloud/base/concepts.py`):
+`ArchitectureService` reasons in terms of `CloudConcept` (`cloud/base/concepts.py`):
 MANAGED_KUBERNETES, CONTAINER_REGISTRY, VIRTUAL_NETWORK, MANAGED_IDENTITY, SECRETS_STORE,
 OBJECT_STORAGE, LOG_ANALYTICS, RESOURCE_GROUP. Each `CloudProvider` implementation maps every
 concept to its own service name and a short, provider-specific explanation. Concept to
@@ -28,15 +28,17 @@ and it is entirely simulated (see docs/safety.md). `AWSProvider` and `GCPProvide
 `is_available = False` and raise `ComingSoonError` from every other method rather than
 returning a fabricated mapping.
 
-## Language tracks
+## Language support
 
-The same pattern applies to `LanguageTrack` (`languages/base/language_track.py`): `PythonTrack`
-is implemented and describes the demo FastAPI app; `GoTrack` declares itself unavailable and
-raises `ComingSoonError`.
+`ProjectAnalyzer` detects `LanguageKind.PYTHON` (via `pyproject.toml`/`requirements.txt`/`*.py`)
+and `LanguageKind.GO` (via `go.mod`) today; Python is the only fully supported track with a
+bundled example project (`projects/api_platform/`). Go detection exists as a clean extension
+point without a bundled example yet.
 
-## Adding a provider or track later
+## Adding a provider later
 
-Implement the `CloudProvider` or `LanguageTrack` interface for the new provider, set
-`is_available = True`, and map every existing `CloudConcept`. No change to curriculum content
-or to the concept vocabulary itself should be required; if a concept genuinely does not
-translate, add a new, honestly-scoped concept rather than stretching an existing one.
+Implement the `CloudProvider` interface (`cloud/base/provider.py`) for the new provider, set
+`is_available = True`, and map every existing `CloudConcept`. No change to
+`ArchitectureService` or to the concept vocabulary itself should be required; if a concept
+genuinely does not translate to a given cloud, add a new, honestly-scoped concept rather than
+stretching an existing one.

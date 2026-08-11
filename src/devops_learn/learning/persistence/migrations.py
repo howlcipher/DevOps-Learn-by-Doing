@@ -10,9 +10,9 @@ SCHEMA_VERSION = 1
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
-    schema_sql = resources.files("devops_learn.learning.persistence").joinpath(
-        "schema.sql"
-    ).read_text()
+    schema_sql = (
+        resources.files("devops_learn.learning.persistence").joinpath("schema.sql").read_text()
+    )
     with conn:
         conn.executescript(schema_sql)
         applied = conn.execute(

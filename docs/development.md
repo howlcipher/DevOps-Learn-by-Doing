@@ -26,28 +26,37 @@ same four steps.
 ## Running it
 
 ```
-devops-learn start
+devops-learn analyze projects/api_platform --mode collaborate --learn-kubernetes
+devops-learn review projects/api_platform
+devops-learn history
+devops-learn explain "Terraform state" --depth deep
 ```
 
 State persists to `~/.devops_learn/learning.db` by default; override with
 `DEVOPS_LEARN_DB_PATH`. Set `ANTHROPIC_API_KEY` to use `AnthropicProvider` instead of
-`MockLLMProvider`; simulation mode works identically either way.
+`MockLLMProvider`; simulation mode works identically either way, since `LLMProvider` only ever
+produces freeform explanation text (docs/adr/0008-structured-ai-output.md).
 
-## Adding curriculum content
+## Adding a detection rule to ProjectAnalyzer
 
-Curriculum content lives under `src/devops_learn/curriculum/modules/` as plain Python builder
-functions returning `domain.curriculum_models` dataclasses, assembled by
-`curriculum/content_library.py`. See docs/learning-model.md for how `ContentBlock.min_depth`
-and `always_include` interact with assistance level and explanation depth; a block that should
-be exempt from depth filtering but still withheld at INDEPENDENT (like `WHAT`) should use the
-default `min_depth` rather than `always_include=True`, which exempts a block from both axes.
-`tests/curriculum/test_content_library_integrity.py` checks structural invariants (hint ladders
-start at 1, check-question answer keys exist, every task declares a competency) automatically.
+`analysis/project_analyzer.py` is a single class with small private helper methods per
+category (`_detect_framework`, `_has_ci_workflows`, `_detect_test_status`, ...). Add a new regex
+or file check there, and add both a positive and a negative case to
+`tests/analysis/test_project_analyzer.py` using `tmp_path`.
 
-## Adding a cloud provider or language track
+## Adding a requirement or recommendation rule
 
-Implement `CloudProvider` (`cloud/base/provider.py`) or `LanguageTrack`
-(`languages/base/language_track.py`), map every existing concept, and set
+`requirements/service.py` and `recommendations/service.py` are both table-driven `if` chains
+keyed off `ProjectAssessment`/`DetectedRequirement.id`. Add a new branch, then add a test in
+`tests/requirements/test_service.py` or `tests/recommendations/test_service.py` asserting the
+new id appears (or is absent) under the right conditions. If the recommendation could ever be
+justified purely by a learning objective rather than the workload's actual needs, set
+`engineering_need` and `learning_value` independently — see
+docs/adr/0006-engineering-needs-vs-learning-objectives.md.
+
+## Adding a cloud provider
+
+Implement `CloudProvider` (`cloud/base/provider.py`), map every existing `CloudConcept`, and set
 `is_available = True`. See docs/cloud-model.md.
 
 ## Adding a tool

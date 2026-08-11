@@ -1,10 +1,4 @@
-from devops_learn.domain.enums import AssistanceLevel, CompetencyState, ExplanationDepth
-
-
-def test_assistance_level_is_ordered_most_support_first() -> None:
-    assert AssistanceLevel.GUIDED < AssistanceLevel.ASSISTED
-    assert AssistanceLevel.ASSISTED < AssistanceLevel.CHALLENGE
-    assert AssistanceLevel.CHALLENGE < AssistanceLevel.INDEPENDENT
+from devops_learn.domain.enums import ExperienceState, ExplanationDepth, OperatingMode
 
 
 def test_explanation_depth_is_ordered_least_to_most() -> None:
@@ -13,6 +7,11 @@ def test_explanation_depth_is_ordered_least_to_most() -> None:
     assert ExplanationDepth.LEARNING < ExplanationDepth.DEEP
 
 
-def test_competency_state_is_ordered_and_demonstrated_is_highest() -> None:
-    assert CompetencyState.NOT_STARTED < CompetencyState.INTRODUCED
-    assert CompetencyState.DEMONSTRATED == max(CompetencyState)
+def test_operating_mode_has_the_four_documented_modes() -> None:
+    assert {m.value for m in OperatingMode} == {"learn", "collaborate", "autopilot", "review"}
+
+
+def test_experience_state_never_implies_certification_language() -> None:
+    names = {s.name for s in ExperienceState}
+    assert "DEMONSTRATED" in names
+    assert not any("CERTIFIED" in name or "MASTERED" in name for name in names)

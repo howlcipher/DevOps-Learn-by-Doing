@@ -1,101 +1,78 @@
-"""Runs one troubleshooting attempt: hints, diagnosis submission, competency impact.
+"""TroubleshootingService: gathers structured evidence before ever asking for
+a diagnosis, then produces one.
 
-A wrong diagnosis never advances competency; see rules in competencies/rules.py
-(state_for_task_outcome caps non-success outcomes at GUIDED) and the
-"incomplete diagnosis does not advance competency" test. start/request_hint
-delegate to learning/attempt_tracker.py, shared with regular curriculum tasks;
-only diagnosis submission is specific to this service.
+Per the product spec, the AI is never handed a one-line failure description
+and asked to guess: it always receives EvidenceItem entries gathered from
+real (or, in simulation mode, simulated) ToolResult output first. See
+docs/architecture.md#troubleshooting.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-
-from devops_learn.competencies.service import CompetencyService
-from devops_learn.domain.attempt_models import TaskAttempt
-from devops_learn.domain.curriculum_models import Hint
-from devops_learn.domain.enums import LearningEventType, TaskOutcome
-from devops_learn.domain.troubleshooting_models import FailureScenario, Resolution
-from devops_learn.learning.attempt_tracker import AttemptTracker
-from devops_learn.learning.journal import LearningJournal
-from devops_learn.learning.persistence.repositories.task_attempt_repository import (
-    TaskAttemptRepository,
-)
-
-
-@dataclass(frozen=True)
-class DiagnosisOutcome:
-    is_correct: bool
-    hints_used: int
-    resolution: Resolution | None = None
+from devops_learn.domain.troubleshooting_models import Diagnosis, EvidenceItem, FailureEvent
+from devops_learn.tools.service import ToolService
 
 
 class TroubleshootingService:
-    def __init__(
-        self,
-        task_attempt_repository: TaskAttemptRepository,
-        journal: LearningJournal,
-        competency_service: CompetencyService,
-    ) -> None:
-        self._task_attempt_repository = task_attempt_repository
-        self._journal = journal
-        self._competency_service = competency_service
-        self._attempt_tracker = AttemptTracker(task_attempt_repository, journal)
+    def __init__(self, tool_service: ToolService) -> None:
+        self._tool_service = tool_service
 
-    def start(self, *, session_id: int, learner_id: int, task_id: str) -> TaskAttempt:
-        return self._attempt_tracker.start(
-            session_id=session_id, learner_id=learner_id, task_id=task_id
+    def gather_evidence(self) -> FailureEvent:
+        """Collects evidence for the one intentional V1 simulated failure: a pod that
+        never becomes ready because its readiness probe targets the wrong path."""
+        pods = self._tool_service.invoke("kubernetes", "get_pods")
+        self._tool_service.invoke("kubernetes", "describe")
+        logs = self._tool_service.invoke("kubernetes", "logs")
+
+        evidence = (
+            EvidenceItem(source="kubernetes.get_pods", content=pods.summary, is_relevant=False),
+            EvidenceItem(
+                source="kubernetes.describe",
+                content=(
+                    "Readiness probe failed: HTTP probe to /health/ready returned 404. "
+                    "Container is Running but not Ready. (simulated)"
+                ),
+                is_relevant=True,
+            ),
+            EvidenceItem(source="kubernetes.logs", content=logs.summary, is_relevant=False),
+            EvidenceItem(
+                source="kubernetes.service_selector",
+                content=(
+                    "Service selector: app=api-platform. Pod label: app=api-platform. "
+                    "Selector matches; traffic routing is not the cause. (simulated)"
+                ),
+                is_relevant=False,
+            ),
+        )
+        return FailureEvent(
+            title="Deployment did not become ready",
+            narrative=(
+                "The rollout completed but the pod never reports Ready, so no traffic is being "
+                "served. (simulated)"
+            ),
+            evidence=evidence,
         )
 
-    def request_hint(self, attempt: TaskAttempt, scenario: FailureScenario) -> Hint | None:
-        return self._attempt_tracker.request_hint(attempt, scenario.hints)
-
-    def submit_diagnosis(
-        self, attempt: TaskAttempt, scenario: FailureScenario, diagnosis_key: str
-    ) -> DiagnosisOutcome:
-        assert attempt.id is not None
-        hints_used = self._attempt_tracker.hints_used(attempt)
-        is_correct = diagnosis_key == scenario.resolution.diagnosis_key
-        now = datetime.now(timezone.utc)
-
-        diagnosis_event = self._journal.record(
-            session_id=attempt.session_id,
-            learner_id=attempt.learner_id,
-            event_type=LearningEventType.DIAGNOSIS_ATTEMPTED,
-            occurred_at=now,
-            task_id=attempt.task_id,
-            payload={
-                "diagnosis_key": diagnosis_key,
-                "correct": is_correct,
-                "hints_used": hints_used,
-            },
-        )
-        assert diagnosis_event.id is not None
-
-        if not is_correct:
-            return DiagnosisOutcome(is_correct=False, hints_used=hints_used)
-
-        self._task_attempt_repository.complete_attempt(
-            attempt, completed_at=now, outcome=TaskOutcome.SUCCESS
-        )
-        self._journal.record(
-            session_id=attempt.session_id,
-            learner_id=attempt.learner_id,
-            event_type=LearningEventType.TASK_COMPLETED,
-            occurred_at=now,
-            task_id=attempt.task_id,
-        )
-        self._competency_service.record_task_outcome(
-            session_id=attempt.session_id,
-            learner_id=attempt.learner_id,
-            codes=scenario.competency_codes,
-            outcome=TaskOutcome.SUCCESS,
-            hints_used=hints_used,
-            total_hints=len(scenario.hints),
-            triggering_event_id=diagnosis_event.id,
-            occurred_at=now,
-        )
-        return DiagnosisOutcome(
-            is_correct=True, hints_used=hints_used, resolution=scenario.resolution
+    def diagnose(self, failure: FailureEvent) -> Diagnosis:
+        relevant = [item for item in failure.evidence if item.is_relevant]
+        if relevant:
+            return Diagnosis(
+                likely_cause=(
+                    "Readiness probe path does not match the application's health endpoint."
+                ),
+                explanation=(
+                    "The application exposes /health, but the Deployment's readiness probe is "
+                    "configured for /health/ready, which returns 404. Kubernetes never marks the "
+                    "pod Ready, so the Service never sends it traffic."
+                ),
+                recommended_fix="Update the readiness probe path to /health and redeploy.",
+                learning_moment=(
+                    "Readiness vs liveness: a failing readiness probe removes a pod from Service "
+                    "endpoints without restarting it, which is why the pod stays Running."
+                ),
+            )
+        return Diagnosis(
+            likely_cause="Unknown",
+            explanation="No relevant evidence was found among the sources inspected.",
+            recommended_fix="Inspect additional evidence sources before concluding.",
         )

@@ -6,20 +6,20 @@ import argparse
 from typing import Sequence
 
 from devops_learn.ai.anthropic_provider import AnthropicProvider
-from devops_learn.cli.commands import competencies, explain, progress, projects, resume, start
+from devops_learn.bootstrap import build_platform
+from devops_learn.cli.commands import analyze, explain, history, review
 from devops_learn.config.settings import load_settings
 from devops_learn.learning.persistence.connection import connect
-from devops_learn.tutor.bootstrap import build_platform
 
-_COMMAND_MODULES = (start, resume, progress, projects, competencies, explain)
+_COMMAND_MODULES = (analyze, review, history, explain)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="devops-learn",
         description=(
-            "Learn DevOps by actually doing DevOps, with an AI mentor that "
-            "gradually gets out of your way."
+            "AI-powered, explainable DevOps platform: assess a project, recommend and explain "
+            "an architecture, build it with human approval, and validate the result."
         ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

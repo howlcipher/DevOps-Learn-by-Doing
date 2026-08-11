@@ -43,11 +43,7 @@ class SimulatedValidationTool(Tool):
         approval: ApprovalRecord | None,
     ) -> ToolResult:
         spec = self.spec_for(operation)
-        assert (
-            not spec.requires_approval
-            or dry_run
-            or (approval is not None and approval.granted)
-        )
+        assert not spec.requires_approval or dry_run or (approval is not None and approval.granted)
 
         if operation == "check_dockerfile_best_practices":
             summary = "No issues found: base image pinned, non-root user present (simulated)"

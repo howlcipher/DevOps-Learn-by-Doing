@@ -14,11 +14,8 @@ import os
 from typing import Any
 
 from devops_learn.ai.provider import LLMProvider
-from devops_learn.ai.types import ArchitectureExplanation, TroubleshootingFeedback, TutorExplanation
-from devops_learn.domain.curriculum_models import Task
-from devops_learn.domain.enums import AssistanceLevel, ExplanationDepth
-from devops_learn.domain.tutor_models import Assessment, Recommendation, RecommendationAlternative
-from devops_learn.domain.troubleshooting_models import EvidenceSource, FailureScenario
+from devops_learn.ai.types import ArchitectureExplanation, TopicExplanation
+from devops_learn.domain.enums import ExplanationDepth
 
 DEFAULT_MODEL = "claude-sonnet-5"
 
@@ -60,73 +57,15 @@ class AnthropicProvider(LLMProvider):
         result: dict[str, Any] = json.loads(text)
         return result
 
-    def explain_topic(
-        self, topic: str, *, level: AssistanceLevel, depth: ExplanationDepth
-    ) -> TutorExplanation:
+    def explain_topic(self, topic: str, *, depth: ExplanationDepth) -> TopicExplanation:
         data = self._complete_json(
             system=(
-                "You are a DevOps tutor. Reply with JSON: "
+                "You are a DevOps engineering assistant. Reply with JSON: "
                 '{"title": str, "body": str}. Be precise, no filler.'
             ),
-            user=(
-                f"Explain '{topic}' to a learner at assistance level {level.name} and "
-                f"explanation depth {depth.name}."
-            ),
+            user=f"Explain '{topic}' at explanation depth {depth.name}.",
         )
-        return TutorExplanation(title=data["title"], body=data["body"])
-
-    def assess_open_response(self, task: Task, learner_response: str) -> Assessment:
-        data = self._complete_json(
-            system=(
-                "You assess a learner's free-text DevOps answer. Reply with JSON: "
-                '{"feedback": str, "is_correct": bool or null}. Use null when there is no '
-                "single right answer (predictions, explain-in-your-own-words)."
-            ),
-            user=f"Task: {task.title}\nGoal: {task.goal}\nLearner answer: {learner_response}",
-        )
-        return Assessment(
-            task_id=task.id, feedback=data["feedback"], is_correct=data.get("is_correct")
-        )
-
-    def recommend(self, title_hint: str, context: str) -> Recommendation:
-        data = self._complete_json(
-            system=(
-                "You produce a structured DevOps recommendation. Reply with JSON: "
-                '{"recommendation": str, "reason": str, "learning_value": str, '
-                '"alternative_option": str, "alternative_why_not": str}.'
-            ),
-            user=f"Decision point: {title_hint}\nContext: {context}",
-        )
-        return Recommendation(
-            title=title_hint,
-            recommendation=data["recommendation"],
-            reason=data["reason"],
-            learning_value=data["learning_value"],
-            alternatives=(
-                RecommendationAlternative(
-                    option=data["alternative_option"],
-                    why_not_preferred=data["alternative_why_not"],
-                ),
-            ),
-        )
-
-    def give_troubleshooting_feedback(
-        self, scenario: FailureScenario, chosen_source: EvidenceSource
-    ) -> TroubleshootingFeedback:
-        data = self._complete_json(
-            system=(
-                "You give short feedback on a troubleshooting step. Reply with JSON: "
-                '{"is_on_track": bool, "message": str}.'
-            ),
-            user=(
-                f"Scenario: {scenario.narrative}\n"
-                f"Learner inspected: {chosen_source.label}\n"
-                f"What it revealed: {chosen_source.evidence_text}"
-            ),
-        )
-        return TroubleshootingFeedback(
-            is_on_track=data["is_on_track"], message=data["message"]
-        )
+        return TopicExplanation(title=data["title"], body=data["body"])
 
     def explain_architecture(self, topic: str) -> ArchitectureExplanation:
         data = self._complete_json(
@@ -141,8 +80,8 @@ class AnthropicProvider(LLMProvider):
     def narrate_summary(self, summary_lines: tuple[str, ...]) -> str:
         data = self._complete_json(
             system=(
-                "You rewrite a bullet list of learning progress facts as one short, "
-                'friendly paragraph. Do not invent facts. Reply with JSON: {"narrative": str}.'
+                "You rewrite a bullet list of project facts as one short, friendly paragraph. "
+                'Do not invent facts. Reply with JSON: {"narrative": str}.'
             ),
             user="\n".join(summary_lines),
         )

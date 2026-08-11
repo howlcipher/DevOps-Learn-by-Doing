@@ -4,23 +4,23 @@ from __future__ import annotations
 
 import argparse
 
-from devops_learn.domain.enums import AssistanceLevel, ExplanationDepth
-from devops_learn.tutor.bootstrap import Platform
+from devops_learn.bootstrap import Platform
+from devops_learn.domain.enums import ExplanationDepth
 
 
 def register(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
-    parser = subparsers.add_parser("explain", help="Ask the tutor to explain a topic")
+    parser = subparsers.add_parser("explain", help="Ask the platform to explain a topic")
     parser.add_argument("topic", nargs="+", help="Topic to explain")
+    parser.add_argument(
+        "--depth", choices=[d.name.lower() for d in ExplanationDepth], default="normal"
+    )
     parser.set_defaults(handler=run)
 
 
 def run(args: argparse.Namespace, platform: Platform) -> None:
     topic = " ".join(args.topic)
-    profile = platform.profile_repository.latest()
-    level = profile.assistance_level if profile is not None else AssistanceLevel.GUIDED
-    depth = profile.explanation_depth if profile is not None else ExplanationDepth.NORMAL
-
-    explanation = platform.llm.explain_topic(topic, level=level, depth=depth)
+    depth = ExplanationDepth[args.depth.upper()]
+    explanation = platform.llm.explain_topic(topic, depth=depth)
     print(explanation.title.upper())
     print()
     print(explanation.body)

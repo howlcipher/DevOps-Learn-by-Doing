@@ -17,17 +17,15 @@ cd projects/api_platform && mypy app --strict && cd ../..
 pytest
 ```
 
-## Adding curriculum content
+## Adding a detection, requirement, or recommendation rule
 
-Curriculum content lives under `src/devops_learn/curriculum/modules/` as plain Python
-builder functions returning domain dataclasses. See `docs/learning-model.md` for the
-content authoring model (assistance level and explanation depth composition).
+See "Adding a detection rule to ProjectAnalyzer" and "Adding a requirement or recommendation
+rule" in `docs/development.md`.
 
-## Adding a cloud or language track
+## Adding a cloud provider
 
-Implement the `CloudProvider` or `LanguageTrack` interface under `src/devops_learn/cloud/`
-or `src/devops_learn/languages/`. Do not implement a full curriculum for a new provider
-until the concept model in `docs/cloud-model.md` covers it.
+Implement the `CloudProvider` interface under `src/devops_learn/cloud/`, mapping every
+existing `CloudConcept`. See `docs/cloud-model.md`.
 
 ## Adding a tool
 

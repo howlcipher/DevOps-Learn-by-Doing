@@ -1,68 +1,68 @@
-import sqlite3
-from datetime import datetime, timezone
-
-from devops_learn.ai.mock_provider import MockLLMProvider
-from devops_learn.competencies.service import CompetencyService
-from devops_learn.curriculum.content_library import build_api_platform_project
-from devops_learn.curriculum.service import CurriculumService
-from devops_learn.domain.competency_models import LearnerCompetency
-from devops_learn.domain.enums import CompetencyState
-from devops_learn.learning.journal import LearningJournal
-from devops_learn.learning.persistence.repositories.competency_repository import (
-    CompetencyRepository,
-)
-from devops_learn.learning.persistence.repositories.event_repository import EventRepository
+from devops_learn.domain.analysis_models import ProjectAssessment
+from devops_learn.domain.enums import CostPriority, LanguageKind, MaturityStatus
 from devops_learn.recommendations.service import RecommendationService
-
-NOW = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
-
-
-def _service(conn: sqlite3.Connection) -> RecommendationService:
-    journal = LearningJournal(EventRepository(conn))
-    competency_service = CompetencyService(CompetencyRepository(conn), journal)
-    return RecommendationService(MockLLMProvider(), CurriculumService(), competency_service)
+from devops_learn.requirements.service import RequirementsService
 
 
-def test_recommend_for_task_reflects_prior_demonstration(
-    conn: sqlite3.Connection, seeded_session: tuple[int, int]
-) -> None:
-    learner_id, _ = seeded_session
-    project = build_api_platform_project()
-    task = project.modules[1].lessons[0].tasks[0]  # task_write_dockerfile -> DOCKER
-
-    for code in task.competency_codes:
-        CompetencyRepository(conn).upsert_state(
-            LearnerCompetency(
-                learner_id=learner_id, code=code, state=CompetencyState.DEMONSTRATED,
-                updated_at=NOW,
-            )
-        )
-
-    recommendation = _service(conn).recommend_for_task(task, learner_id=learner_id)
-    assert "already demonstrated" in recommendation.learning_value
-
-
-def test_recommend_next_step_at_the_final_module_suggests_architecture_review(
-    conn: sqlite3.Connection,
-) -> None:
-    curriculum = CurriculumService()
-    last_module_id = curriculum.project.modules[-1].id
-    recommendation = _service(conn).recommend_next_step(
-        learner_id=1, current_module_id=last_module_id
+def _assessment(**overrides: object) -> ProjectAssessment:
+    defaults: dict[str, object] = dict(
+        root_path="/tmp/x",
+        application_type="FastAPI HTTP API",
+        language=LanguageKind.PYTHON,
+        framework="FastAPI",
+        containerization_status=MaturityStatus.MISSING,
+        ci_cd_status=MaturityStatus.MISSING,
+        iac_status=MaturityStatus.MISSING,
+        cloud_status=MaturityStatus.MISSING,
+        healthcheck_status=MaturityStatus.GOOD,
+        test_status=MaturityStatus.PARTIAL,
+        observability_status=MaturityStatus.MISSING,
     )
-    assert "architecture" in recommendation.recommendation.lower()
-    assert "review" in recommendation.recommendation.lower()
+    defaults.update(overrides)
+    return ProjectAssessment(**defaults)  # type: ignore[arg-type]
 
 
-def test_recommend_next_step_mid_project_suggests_the_next_module(
-    conn: sqlite3.Connection,
-) -> None:
-    curriculum = CurriculumService()
-    first_module_id = curriculum.project.modules[0].id
-    second_module = curriculum.next_module(first_module_id)
-    assert second_module is not None
-
-    recommendation = _service(conn).recommend_next_step(
-        learner_id=1, current_module_id=first_module_id
+def test_recommends_against_kubernetes_when_not_a_learning_objective() -> None:
+    assessment = _assessment()
+    requirements = RequirementsService().detect(assessment)
+    recs = RecommendationService().build_recommendations(
+        assessment,
+        requirements,
+        cost_priority=CostPriority.BALANCED,
+        wants_kubernetes_experience=False,
     )
-    assert second_module.title in recommendation.title
+    k8s = next(r for r in recs if r.category.value == "kubernetes")
+    assert k8s.id == "rec_no_kubernetes"
+    assert (
+        "not required" in k8s.engineering_need.lower()
+        or "unnecessary" in k8s.engineering_need.lower()
+    )
+
+
+def test_recommends_kubernetes_as_learning_only_when_requested() -> None:
+    assessment = _assessment()
+    requirements = RequirementsService().detect(assessment)
+    recs = RecommendationService().build_recommendations(
+        assessment,
+        requirements,
+        cost_priority=CostPriority.BALANCED,
+        wants_kubernetes_experience=True,
+    )
+    k8s = next(r for r in recs if r.category.value == "kubernetes")
+    assert k8s.id == "rec_kubernetes"
+    assert k8s.learning_value
+    assert k8s.requires_user_decision is True
+
+
+def test_engineering_need_and_learning_value_are_tracked_separately() -> None:
+    assessment = _assessment()
+    requirements = RequirementsService().detect(assessment)
+    recs = RecommendationService().build_recommendations(
+        assessment,
+        requirements,
+        cost_priority=CostPriority.BALANCED,
+        wants_kubernetes_experience=True,
+    )
+    k8s = next(r for r in recs if r.id == "rec_kubernetes")
+    assert "not required" in k8s.engineering_need.lower()
+    assert "learning objective" in k8s.learning_value.lower()

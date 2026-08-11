@@ -1,265 +1,149 @@
 import sqlite3
 from datetime import datetime, timezone
 
-from devops_learn.domain.attempt_models import HintUsage, TaskAttempt
-from devops_learn.domain.competency_models import CompetencyTransition, LearnerCompetency
+from devops_learn.domain.audit_models import AuditEvent
 from devops_learn.domain.enums import (
-    AssistanceLevel,
+    AuditEventType,
     CloudProviderKind,
-    CompetencyCode,
-    CompetencyState,
+    CostPriority,
+    EnvironmentKind,
+    ExperienceState,
     ExplanationDepth,
-    LanguageTrackKind,
-    LearningEventType,
-    SessionStatus,
-    TaskOutcome,
+    OperatingMode,
 )
-from devops_learn.domain.event_models import LearningEvent
-from devops_learn.domain.learner_models import LearnerProfile, LearningSession
+from devops_learn.domain.experience_models import ExperienceEntry
 from devops_learn.domain.project_models import Artifact
+from devops_learn.domain.question_models import Decision
+from devops_learn.domain.session_models import EngagementSession
 from devops_learn.learning.persistence.repositories.artifact_repository import (
     ArtifactRepository,
 )
-from devops_learn.learning.persistence.repositories.competency_repository import (
-    CompetencyRepository,
+from devops_learn.learning.persistence.repositories.audit_repository import AuditRepository
+from devops_learn.learning.persistence.repositories.decision_repository import (
+    DecisionRepository,
 )
-from devops_learn.learning.persistence.repositories.event_repository import EventRepository
-from devops_learn.learning.persistence.repositories.learner_profile_repository import (
-    LearnerProfileRepository,
+from devops_learn.learning.persistence.repositories.experience_repository import (
+    ExperienceRepository,
 )
 from devops_learn.learning.persistence.repositories.session_repository import SessionRepository
-from devops_learn.learning.persistence.repositories.task_attempt_repository import (
-    TaskAttemptRepository,
-)
 
 NOW = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
 
 
-def _make_profile() -> LearnerProfile:
-    return LearnerProfile(
-        display_name="Learner One",
-        cloud_provider=CloudProviderKind.AZURE,
-        language_track=LanguageTrackKind.PYTHON,
-        assistance_level=AssistanceLevel.GUIDED,
+def _make_session() -> EngagementSession:
+    return EngagementSession(
+        project_root="/tmp/example",
+        mode=OperatingMode.COLLABORATE,
         explanation_depth=ExplanationDepth.LEARNING,
-        created_at=NOW,
-        updated_at=NOW,
+        cloud=CloudProviderKind.AZURE,
+        environment=EnvironmentKind.DEV,
+        cost_priority=CostPriority.BALANCED,
+        simulation_mode=True,
+        started_at=NOW,
     )
 
 
-def test_learner_profile_round_trips(conn: sqlite3.Connection) -> None:
-    repo = LearnerProfileRepository(conn)
-    created = repo.create(_make_profile())
+def test_session_round_trips_and_can_be_completed(conn: sqlite3.Connection) -> None:
+    repo = SessionRepository(conn)
+    created = repo.create(_make_session())
     assert created.id is not None
     fetched = repo.get(created.id)
     assert fetched == created
 
+    completed = repo.complete(created, completed_at=NOW)
+    assert completed.completed_at == NOW
+    assert repo.latest() is not None
+    assert repo.latest().id == created.id  # type: ignore[union-attr]
 
-def test_session_created_and_resumable_by_pointer(conn: sqlite3.Connection) -> None:
-    profile_repo = LearnerProfileRepository(conn)
-    profile = profile_repo.create(_make_profile())
-    assert profile.id is not None
 
-    session_repo = SessionRepository(conn)
-    session = session_repo.create(
-        LearningSession(
-            learner_id=profile.id,
-            project_id="api_platform",
-            status=SessionStatus.ACTIVE,
-            simulation_mode=True,
-            started_at=NOW,
-            last_active_at=NOW,
-        )
-    )
+def test_audit_events_get_monotonic_sequence_numbers(conn: sqlite3.Connection) -> None:
+    session = SessionRepository(conn).create(_make_session())
     assert session.id is not None
 
-    updated = session_repo.update_pointer(
-        LearningSession(
-            id=session.id,
-            learner_id=profile.id,
-            project_id="api_platform",
-            status=SessionStatus.ACTIVE,
-            simulation_mode=True,
-            started_at=NOW,
-            last_active_at=NOW,
-            current_module_id="module_02_containerize",
-            current_lesson_id="lesson_containerize",
-            current_task_id="task_write_dockerfile",
-        )
-    )
-    assert updated.current_task_id == "task_write_dockerfile"
-
-    resumed = session_repo.latest_active_for_learner(profile.id)
-    assert resumed is not None
-    assert resumed.current_task_id == "task_write_dockerfile"
-
-
-def test_events_get_monotonic_sequence_numbers(conn: sqlite3.Connection) -> None:
-    profile = LearnerProfileRepository(conn).create(_make_profile())
-    assert profile.id is not None
-    session = SessionRepository(conn).create(
-        LearningSession(
-            learner_id=profile.id,
-            project_id="api_platform",
-            status=SessionStatus.ACTIVE,
-            simulation_mode=True,
-            started_at=NOW,
-            last_active_at=NOW,
-        )
-    )
-    assert session.id is not None
-
-    event_repo = EventRepository(conn)
-    first = event_repo.append(
-        LearningEvent(
+    audit_repo = AuditRepository(conn)
+    first = audit_repo.append(
+        AuditEvent(
             session_id=session.id,
-            learner_id=profile.id,
-            sequence_no=event_repo.next_sequence_no(session.id),
-            event_type=LearningEventType.SESSION_STARTED,
+            sequence_no=audit_repo.next_sequence_no(session.id),
+            event_type=AuditEventType.SESSION_STARTED,
             occurred_at=NOW,
+            summary="Session started",
         )
     )
-    second = event_repo.append(
-        LearningEvent(
+    second = audit_repo.append(
+        AuditEvent(
             session_id=session.id,
-            learner_id=profile.id,
-            sequence_no=event_repo.next_sequence_no(session.id),
-            event_type=LearningEventType.LESSON_STARTED,
+            sequence_no=audit_repo.next_sequence_no(session.id),
+            event_type=AuditEventType.PROJECT_ANALYZED,
             occurred_at=NOW,
-            payload={"lesson_id": "lesson_understand_workload"},
+            summary="Analyzed",
+            payload={"language": "python"},
         )
     )
     assert first.sequence_no == 1
     assert second.sequence_no == 2
 
-    events = event_repo.list_for_session(session.id)
+    events = audit_repo.list_for_session(session.id)
     assert [e.sequence_no for e in events] == [1, 2]
-    assert events[1].payload == {"lesson_id": "lesson_understand_workload"}
+    assert events[1].payload == {"language": "python"}
 
 
-def test_competency_state_upsert_and_transition_history(conn: sqlite3.Connection) -> None:
-    profile = LearnerProfileRepository(conn).create(_make_profile())
-    assert profile.id is not None
-    session = SessionRepository(conn).create(
-        LearningSession(
-            learner_id=profile.id,
-            project_id="api_platform",
-            status=SessionStatus.ACTIVE,
-            simulation_mode=True,
-            started_at=NOW,
-            last_active_at=NOW,
-        )
-    )
+def test_decisions_are_recorded_and_listed(conn: sqlite3.Connection) -> None:
+    session = SessionRepository(conn).create(_make_session())
     assert session.id is not None
-    event = EventRepository(conn).append(
-        LearningEvent(
+
+    repo = DecisionRepository(conn)
+    repo.record(
+        session.id,
+        Decision(
+            subject_kind="question",
+            subject_id="environment",
+            outcome="Production-like",
+            detail=None,
+            decided_at=NOW,
+        ),
+    )
+    decisions = repo.list_for_session(session.id)
+    assert len(decisions) == 1
+    assert decisions[0].outcome == "Production-like"
+
+
+def test_experience_entries_upsert_by_concept_and_item(conn: sqlite3.Connection) -> None:
+    session = SessionRepository(conn).create(_make_session())
+    assert session.id is not None
+
+    repo = ExperienceRepository(conn)
+    repo.record(
+        ExperienceEntry(
             session_id=session.id,
-            learner_id=profile.id,
-            sequence_no=1,
-            event_type=LearningEventType.TASK_COMPLETED,
+            concept="Terraform",
+            item="Reviewed generated Terraform",
+            state=ExperienceState.OBSERVED,
             occurred_at=NOW,
         )
     )
-    assert event.id is not None
-
-    repo = CompetencyRepository(conn)
-    repo.upsert_state(
-        LearnerCompetency(
-            learner_id=profile.id,
-            code=CompetencyCode.DOCKER,
-            state=CompetencyState.INTRODUCED,
-            updated_at=NOW,
-        )
-    )
-    repo.upsert_state(
-        LearnerCompetency(
-            learner_id=profile.id,
-            code=CompetencyCode.DOCKER,
-            state=CompetencyState.DEMONSTRATED,
-            updated_at=NOW,
-            evidence_event_id=event.id,
-        )
-    )
-    state = repo.get_state(profile.id, CompetencyCode.DOCKER)
-    assert state is not None
-    assert state.state == CompetencyState.DEMONSTRATED
-
-    repo.record_transition(
-        CompetencyTransition(
-            learner_id=profile.id,
-            code=CompetencyCode.DOCKER,
-            from_state=CompetencyState.INTRODUCED,
-            to_state=CompetencyState.DEMONSTRATED,
-            triggering_event_id=event.id,
+    repo.record(
+        ExperienceEntry(
+            session_id=session.id,
+            concept="Terraform",
+            item="Reviewed generated Terraform",
+            state=ExperienceState.PARTICIPATED,
             occurred_at=NOW,
         )
     )
-    transitions = repo.list_transitions(profile.id)
-    assert len(transitions) == 1
-    assert transitions[0].to_state == CompetencyState.DEMONSTRATED
-
-
-def test_hint_usage_increments_task_attempt_hint_count(conn: sqlite3.Connection) -> None:
-    profile = LearnerProfileRepository(conn).create(_make_profile())
-    assert profile.id is not None
-    session = SessionRepository(conn).create(
-        LearningSession(
-            learner_id=profile.id,
-            project_id="api_platform",
-            status=SessionStatus.ACTIVE,
-            simulation_mode=True,
-            started_at=NOW,
-            last_active_at=NOW,
-        )
-    )
-    assert session.id is not None
-
-    attempt_repo = TaskAttemptRepository(conn)
-    attempt = attempt_repo.start_attempt(
-        TaskAttempt(
-            session_id=session.id,
-            task_id="task_write_dockerfile",
-            learner_id=profile.id,
-            attempt_no=1,
-            started_at=NOW,
-        )
-    )
-    assert attempt.id is not None
-
-    attempt_repo.record_hint_usage(
-        HintUsage(task_attempt_id=attempt.id, hint_level=1, requested_at=NOW)
-    )
-    attempt_repo.record_hint_usage(
-        HintUsage(task_attempt_id=attempt.id, hint_level=2, requested_at=NOW)
-    )
-    assert attempt_repo.count_hints_used(attempt.id) == 2
-
-    completed = attempt_repo.complete_attempt(
-        attempt, completed_at=NOW, outcome=TaskOutcome.SUCCESS
-    )
-    assert completed.outcome == TaskOutcome.SUCCESS
+    entries = repo.list_for_session(session.id)
+    assert len(entries) == 1
+    assert entries[0].state == ExperienceState.PARTICIPATED
 
 
 def test_artifact_created_and_listed(conn: sqlite3.Connection) -> None:
-    profile = LearnerProfileRepository(conn).create(_make_profile())
-    assert profile.id is not None
-    session = SessionRepository(conn).create(
-        LearningSession(
-            learner_id=profile.id,
-            project_id="api_platform",
-            status=SessionStatus.ACTIVE,
-            simulation_mode=True,
-            started_at=NOW,
-            last_active_at=NOW,
-        )
-    )
+    session = SessionRepository(conn).create(_make_session())
     assert session.id is not None
 
     artifact_repo = ArtifactRepository(conn)
     artifact_repo.create(
         Artifact(
             session_id=session.id,
-            learner_id=profile.id,
             artifact_type="dockerfile",
             path_or_ref="projects/api_platform/Dockerfile",
             created_at=NOW,
