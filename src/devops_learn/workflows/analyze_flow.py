@@ -17,9 +17,9 @@ from devops_learn.domain.enums import (
     CloudProviderKind,
     CostPriority,
     EnvironmentKind,
+    ExecutionMode,
     ExperienceState,
     ExplanationDepth,
-    OperatingMode,
 )
 from devops_learn.domain.explanation_models import Explanation
 from devops_learn.domain.plan_models import ImplementationPlan, PlanStep
@@ -35,7 +35,7 @@ from devops_learn.workflows.ui import Ui
 @dataclass(frozen=True)
 class AnalyzeOptions:
     project_root: str
-    mode: OperatingMode
+    mode: ExecutionMode
     explanation_depth: ExplanationDepth
     cloud: CloudProviderKind
     environment: EnvironmentKind | None
@@ -77,7 +77,7 @@ def run_analysis(platform: Platform, ui: Ui, options: AnalyzeOptions) -> Engagem
         )
     ui.present(presenters.render_requirements(requirements))
 
-    if options.mode is OperatingMode.REVIEW:
+    if options.mode is ExecutionMode.OBSERVE:
         _run_review_only(platform, ui, session_id, assessment, requirements, options)
         platform.session_service.complete(session)
         return session
@@ -102,7 +102,7 @@ def run_analysis(platform: Platform, ui: Ui, options: AnalyzeOptions) -> Engagem
         summary=architecture.summary,
     )
     ui.present(presenters.render_architecture(architecture))
-    if options.mode in (OperatingMode.LEARN, OperatingMode.COLLABORATE):
+    if options.mode in (ExecutionMode.GUIDED, ExecutionMode.COLLABORATIVE):
         if not ui.confirm("Proceed with this architecture?", default=True):
             ui.present("Stopping before any implementation. Nothing was changed.")
             platform.session_service.complete(session)
@@ -186,8 +186,8 @@ def _walk_recommendations(
         ui.present(presenters.render_recommendation(rec))
 
         should_ask = rec.requires_user_decision and options.mode in (
-            OperatingMode.LEARN,
-            OperatingMode.COLLABORATE,
+            ExecutionMode.GUIDED,
+            ExecutionMode.COLLABORATIVE,
         )
         if should_ask:
             proceed = ui.confirm(f"Accept recommendation '{rec.title}'?", default=True)
@@ -235,7 +235,7 @@ def _run_review_only(
     ui.present("\n".join(lines))
     for i, requirement in enumerate(roadmap, start=1):
         platform.experience_tracker.record(
-            session_id, "Review", f"Prioritized: {requirement.title}", ExperienceState.OBSERVED
+            session_id, "Review", f"Prioritized: {requirement.title}", ExperienceState.INTRODUCED
         )
 
 
@@ -301,7 +301,7 @@ def _run_step(
             summary=summary.reason,
         )
         platform.experience_tracker.record(
-            session_id, "Terraform", "Interpreted Terraform plan", ExperienceState.PARTICIPATED
+            session_id, "Terraform", "Interpreted Terraform plan", ExperienceState.PRACTICED
         )
 
     if step.tool_name == "terraform" and step.operation == "apply_approved_plan":
@@ -315,7 +315,7 @@ def _run_step(
             session_id,
             "Terraform",
             "Approved infrastructure deployment",
-            ExperienceState.PARTICIPATED,
+            ExperienceState.PRACTICED,
         )
 
     _record_experience_for_step(platform, session_id, step)
@@ -337,7 +337,7 @@ def _record_experience_for_step(platform: Platform, session_id: int, step: PlanS
     entry = mapping.get((step.tool_name, step.operation))
     if entry is not None:
         concept, item = entry
-        platform.experience_tracker.record(session_id, concept, item, ExperienceState.PARTICIPATED)
+        platform.experience_tracker.record(session_id, concept, item, ExperienceState.PRACTICED)
 
 
 def _explain_step(step: PlanStep) -> Explanation:
@@ -381,7 +381,7 @@ def _run_health_check_and_troubleshoot(
     )
     ui.present(presenters.render_diagnosis(diagnosis))
     platform.experience_tracker.record(
-        session_id, "Kubernetes", "Investigated readiness failure", ExperienceState.PARTICIPATED
+        session_id, "Kubernetes", "Investigated readiness failure", ExperienceState.PRACTICED
     )
 
     if ui.confirm("Apply the recommended fix and roll back the bad rollout?", default=True):
@@ -394,7 +394,7 @@ def _run_health_check_and_troubleshoot(
             summary=result.summary,
         )
         platform.experience_tracker.record(
-            session_id, "Kubernetes", "Performed rollback", ExperienceState.PARTICIPATED
+            session_id, "Kubernetes", "Performed rollback", ExperienceState.PRACTICED
         )
 
 

@@ -3,7 +3,7 @@
 ## Setup
 
 ```
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
@@ -26,10 +26,26 @@ same four steps.
 ## Running it
 
 ```
-devops-learn analyze projects/api_platform --mode collaborate --learn-kubernetes
+# Set your learner profile (stored in SQLite)
+devops-learn profile --set docker=strong terraform=beginner --focus terraform
+
+# Inspect a project and record goals
+devops-learn init projects/api_platform
+
+# Real local vertical slice: test -> lint -> docker build -> run -> verify
+devops-learn local projects/api_platform
+
+# Simulate the full cloud workflow (no credentials, no cost)
+devops-learn analyze projects/api_platform --mode collaborative --depth learning
+
+# Review an existing project without building anything
 devops-learn review projects/api_platform
-devops-learn history
+
+# Explain a topic outside a session
 devops-learn explain "Terraform state" --depth deep
+
+# Show the audit history of the latest session
+devops-learn history
 ```
 
 State persists to `~/.devops_learn/learning.db` by default; override with
@@ -61,10 +77,21 @@ Implement `CloudProvider` (`cloud/base/provider.py`), map every existing `CloudC
 
 ## Adding a tool
 
-All tool operations are simulated in V1 (docs/safety.md). Implement the `Tool` interface
-(`tools/base.py`), declare accurate `risk_level`/`is_destructive`/`supports_dry_run` metadata,
-and never bypass `ToolService.invoke`. `ToolOperationSpec.__post_init__` will reject an
-inconsistent DESTRUCTIVE declaration at construction time.
+Implement the `Tool` interface (`tools/base.py`), declare accurate
+`risk_level`/`is_destructive`/`supports_dry_run` metadata, and never bypass
+`ToolService.invoke`. `ToolOperationSpec.__post_init__` will reject an inconsistent DESTRUCTIVE
+declaration at construction time.
+
+Provide a `Simulated*Tool` for tests and environments where the real dependency is unavailable,
+and a `Real*Tool` that shells out to the actual binary. See `tools/python_tool.py` and
+`tools/docker_tool.py` for the pattern.
+
+## Adding a workflow command
+
+CLI commands live in `cli/commands/*.py` and are registered in `cli/main.py`. They receive a
+`Platform` from the composition root (`bootstrap.py`) and should remain thin: argument parsing
+and a call to a workflow function in `workflows/`. Workflow functions depend only on the `Ui`
+abstraction so they can be reused by a future web UI.
 
 ## Project layout
 

@@ -24,18 +24,19 @@ class LanguageKind(Enum):
     UNKNOWN = "unknown"
 
 
-class OperatingMode(Enum):
-    """How much the human is asked to decide versus have explained to them.
+class ExecutionMode(Enum):
+    """Who performs the work: a separate axis from ExplanationDepth.
 
-    See docs/adr/0003-human-approval-gates.md. This is orthogonal to
-    ExplanationDepth: a mode controls how much interaction happens, a depth
-    controls how deeply any given explanation goes.
+    See docs/adr/0003-human-approval-gates.md and docs/learning-model.md.
+    Mode controls how much the human is asked to decide or perform; depth
+    controls how detailed any explanation is.
     """
 
-    LEARN = "learn"
-    COLLABORATE = "collaborate"
-    AUTOPILOT = "autopilot"
-    REVIEW = "review"
+    OBSERVE = "observe"
+    GUIDED = "guided"
+    COLLABORATIVE = "collaborative"
+    AI_EXECUTED = "ai_executed"
+    AUTONOMOUS = "autonomous"
 
 
 class ExplanationDepth(IntEnum):
@@ -117,13 +118,17 @@ class DecisionOutcome(Enum):
 
 
 class ExperienceState(Enum):
-    """An evidence log, not a certification: see docs/adr/0008 (renumbered) ->
-    experience is what the user was actually exposed to or did, nothing more."""
+    """Competency evidence, not certification.
 
-    NOT_SEEN = "not_seen"
-    EXPLAINED = "explained"
-    OBSERVED = "observed"
-    PARTICIPATED = "participated"
+    Progress reflects understanding and judgment, not how many characters the
+    learner manually typed. See docs/adr/0008 (renumbered) and
+    docs/learning-model.md.
+    """
+
+    NOT_STARTED = "not_started"
+    INTRODUCED = "introduced"
+    GUIDED = "guided"
+    PRACTICED = "practiced"
     DEMONSTRATED = "demonstrated"
 
 

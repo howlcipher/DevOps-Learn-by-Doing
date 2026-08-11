@@ -10,8 +10,8 @@ from devops_learn.domain.enums import (
     CloudProviderKind,
     CostPriority,
     EnvironmentKind,
+    ExecutionMode,
     ExplanationDepth,
-    OperatingMode,
 )
 from devops_learn.domain.session_models import EngagementSession
 from devops_learn.learning.persistence.repositories.session_repository import SessionRepository
@@ -26,7 +26,7 @@ class SessionService:
         self,
         *,
         project_root: str,
-        mode: OperatingMode,
+        mode: ExecutionMode,
         explanation_depth: ExplanationDepth,
         cloud: CloudProviderKind,
         environment: EnvironmentKind,

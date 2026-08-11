@@ -8,8 +8,8 @@ from devops_learn.domain.enums import (
     CloudProviderKind,
     CostPriority,
     EnvironmentKind,
+    ExecutionMode,
     ExplanationDepth,
-    OperatingMode,
 )
 from devops_learn.domain.session_models import EngagementSession
 from devops_learn.learning.persistence.connection import connect_in_memory
@@ -33,7 +33,7 @@ def seeded_session(conn: sqlite3.Connection) -> int:
     session = SessionRepository(conn).create(
         EngagementSession(
             project_root="/tmp/example",
-            mode=OperatingMode.COLLABORATE,
+            mode=ExecutionMode.COLLABORATIVE,
             explanation_depth=ExplanationDepth.NORMAL,
             cloud=CloudProviderKind.AZURE,
             environment=EnvironmentKind.DEV,

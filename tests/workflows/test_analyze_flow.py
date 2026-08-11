@@ -7,8 +7,8 @@ from devops_learn.domain.enums import (
     CloudProviderKind,
     CostPriority,
     EnvironmentKind,
+    ExecutionMode,
     ExplanationDepth,
-    OperatingMode,
 )
 from devops_learn.tools.approval import AutoApproveApprovalGate
 from devops_learn.workflows.analyze_flow import AnalyzeOptions, run_analysis
@@ -44,7 +44,7 @@ def test_full_simulation_completes_in_collaborate_mode(conn: sqlite3.Connection)
     ui = ScriptedUi()
     options = AnalyzeOptions(
         project_root=str(API_PLATFORM),
-        mode=OperatingMode.COLLABORATE,
+        mode=ExecutionMode.COLLABORATIVE,
         explanation_depth=ExplanationDepth.LEARNING,
         cloud=CloudProviderKind.AZURE,
         environment=EnvironmentKind.STAGING,
@@ -75,7 +75,7 @@ def test_review_mode_never_touches_tools_or_asks_decisions(conn: sqlite3.Connect
     ui = ScriptedUi()
     options = AnalyzeOptions(
         project_root=str(API_PLATFORM),
-        mode=OperatingMode.REVIEW,
+        mode=ExecutionMode.OBSERVE,
         explanation_depth=ExplanationDepth.NORMAL,
         cloud=CloudProviderKind.AZURE,
         environment=None,
@@ -93,14 +93,14 @@ def test_review_mode_never_touches_tools_or_asks_decisions(conn: sqlite3.Connect
     assert any("roadmap" in p.lower() for p in ui.presented)
 
 
-def test_autopilot_mode_still_requires_approval_for_terraform_apply(
+def test_ai_executed_mode_still_requires_approval_for_terraform_apply(
     conn: sqlite3.Connection,
 ) -> None:
     platform = _platform(conn)
     ui = ScriptedUi()
     options = AnalyzeOptions(
         project_root=str(API_PLATFORM),
-        mode=OperatingMode.AUTOPILOT,
+        mode=ExecutionMode.AI_EXECUTED,
         explanation_depth=ExplanationDepth.BRIEF,
         cloud=CloudProviderKind.AZURE,
         environment=EnvironmentKind.PRODUCTION,
@@ -121,7 +121,7 @@ def test_production_environment_triggers_a_higher_risk_terraform_plan(
     ui = ScriptedUi()
     options = AnalyzeOptions(
         project_root=str(API_PLATFORM),
-        mode=OperatingMode.COLLABORATE,
+        mode=ExecutionMode.COLLABORATIVE,
         explanation_depth=ExplanationDepth.NORMAL,
         cloud=CloudProviderKind.AZURE,
         environment=EnvironmentKind.PRODUCTION,

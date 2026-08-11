@@ -1,14 +1,12 @@
 # DevOps Learn by Doing
 
-An AI-powered DevOps platform that evaluates what your project needs, explains the engineering
-decisions, and builds the infrastructure with you.
+An AI-native DevOps learning and engineering environment. It performs real
+project work while deliberately teaching the concepts you need to understand.
 
-Learn DevOps through the real systems being designed, deployed, and operated — not through
-disconnected tutorials. The platform inspects a real project, tells you what it actually needs
-versus what you only *want* for learning, asks you the handful of decisions that genuinely
-matter, proposes and explains an architecture, generates and validates the implementation, and
-performs it once you approve — all while keeping an append-only audit log and an evidence log of
-what you were actually exposed to or did.
+The goal is not to make you stop using AI, and it is not to let AI do
+everything blindly. The goal is **AI-assisted DevOps mastery**: you and the AI
+do real engineering work together, and the platform explains exactly enough for
+you to direct, review, troubleshoot, validate, and improve what the AI produces.
 
 ```text
 Project -> Analysis -> Requirements -> Questions -> Recommendations -> Architecture
@@ -16,16 +14,25 @@ Project -> Analysis -> Requirements -> Questions -> Recommendations -> Architect
     -> Troubleshoot -> Audit + Experience summary
 ```
 
-## Status: V1 skeleton
+## What works
 
-V1 implements this full workflow end to end in **simulation mode**: real, deterministic project
-analysis against any repository path (including the bundled Python FastAPI example), real
-requirements/recommendation/architecture/plan logic, and simulated Docker/Terraform/Kubernetes/
-cloud execution behind the same controlled-tool interface real execution will later use. Azure
-is the only fully implemented cloud; AWS and GCP are honest extension points
-(`ComingSoonError`, never fabricated parity). Python is the only fully supported language track
-with a bundled example project; Go has detection but no bundled example yet. See
-`docs/safety.md` for exactly what is real versus simulated.
+- **Real project analysis** against any repository path, including the bundled
+  `projects/api_platform` FastAPI app.
+- **Learner skill profile**: declare what you already know and what you want to
+  learn so explanations target your actual gaps.
+- **Project intake** (`devops-learn init`) inspects a project and asks only the
+  questions that cannot be inferred safely.
+- **Real local execution** (`devops-learn local`) runs actual `pytest`, `flake8`,
+  `docker build`, `docker run`, and HTTP health checks against the project.
+- **Simulated cloud/Terraform/Kubernetes** execution for safe learning without
+  credentials or cost (`devops-learn analyze` without `--real-tools`).
+- **Controlled tool execution**: every capability is a `Tool` with declared
+  risk level, dry-run support, and human approval; `ToolService` is the only
+  caller of `Tool.execute`.
+- **Competency evidence tracking**: records what you were exposed to, practiced,
+  or demonstrated, not fabricated certification.
+
+See `docs/safety.md` for exactly what is real versus simulated.
 
 ## Install
 
@@ -33,74 +40,106 @@ with a bundled example project; Go has detection but no bundled example yet. See
 pip install -e ".[dev]"
 ```
 
-## Run
+## Quick start
 
 ```
-devops-learn analyze projects/api_platform --mode collaborate --learn-kubernetes
+# Set up a learner profile (optional but recommended)
+devops-learn profile --set docker=strong terraform=beginner azure=developing \
+                     --focus terraform --focus azure
+
+# Inspect a project and record your goals
+devops-learn init projects/api_platform
+
+# Run a real local vertical slice: test -> lint -> docker build -> run -> verify
+devops-learn local projects/api_platform
+
+# Simulate the full cloud workflow (no credentials, no cost)
+devops-learn analyze projects/api_platform --mode collaborative --depth learning
+
+# Review an existing project's maturity without building anything
 devops-learn review projects/api_platform
-devops-learn history
+
+# Explain a topic outside a session
 devops-learn explain "Terraform state" --depth deep
 ```
 
-`analyze` runs the full assess -> recommend -> build -> validate -> verify workflow.
-`review` stops after assessment and produces a prioritized roadmap without building anything —
-and can, correctly, tell you Kubernetes is not needed. `--mode` accepts `learn`, `collaborate`
-(default), `autopilot`, or `review`; `--depth` accepts `brief`, `normal` (default), `learning`,
-`deep`.
+## Execution modes
 
-## Operating modes
+Execution mode controls **who performs the work**. Explanation depth controls
+**how much detail** is provided. They are independent axes.
 
 | Mode | What it does |
 |---|---|
-| `learn` | Performs the work but explains extensively: what, why, alternatives, what to understand. |
-| `collaborate` (default) | Handles routine implementation automatically; asks you to decide the recommendations and questions that materially affect architecture. |
-| `autopilot` | Minimizes questions and narration; still requires human approval for HIGH/DESTRUCTIVE operations (Terraform apply, deletions, identity/secret changes) — never bypassed by mode. |
-| `review` | Evaluates an existing project's DevOps maturity and produces a prioritized roadmap. Builds nothing. |
+| `observe` | AI analyzes and explains; no changes are made. |
+| `guided` | AI explains the next step; you perform meaningful actions. |
+| `collaborative` (default) | AI generates and performs substantial work while involving you in important decisions. |
+| `ai_executed` | AI performs approved work and narrates what, why, expected result, actual result, risks, and rollback. |
+| `autonomous` | AI may execute a sequence of previously authorized safe operations. Destructive/costly/production-impacting actions still require approval. |
 
-Explanation depth is a second, independent axis: "autopilot mode with deep explanations if I
-inspect a decision" is representable, per `docs/adr/0002-explainable-ai-workflow.md`.
+## Explanation depth
+
+| Depth | What it provides |
+|---|---|
+| `brief` | Action summary only. |
+| `normal` (default) | Action, why, decision, alternatives, tradeoff. |
+| `learning` | Adds "what you should understand" with conceptual context. |
+| `deep` | Full conceptual background, risk, validation, and next steps. |
+
+## AI-assisted DevOps mastery
+
+The platform teaches in context: when Terraform or Azure concepts appear, it
+explains them at the depth your learner profile says you need. Competency is
+measured by understanding and judgment — recognizing a dangerous Terraform plan,
+explaining why state matters, diagnosing a failing container — not by how many
+commands you manually typed. See `docs/learning-model.md`.
 
 ## Engineering needs vs. learning objectives
 
 Every `Recommendation` tracks `engineering_need` and `learning_value` separately
-(`docs/adr/0006-engineering-needs-vs-learning-objectives.md`). The platform will tell you
-Kubernetes is unnecessary for a given workload even while proposing a Kubernetes-based
-architecture *because you asked to learn it* — the two justifications are never merged into one
-generic "reason."
+(`docs/adr/0006-engineering-needs-vs-learning-objectives.md`). The platform will
+tell you Kubernetes is unnecessary for a given workload even while proposing a
+Kubernetes-based architecture *because you asked to learn it* — the two
+justifications are never merged into one generic "reason."
 
 ## Safety
 
 - The AI never gets unrestricted execution. Every capability is a `Tool`
-  (`tools/base.py`) with declared risk level, dry-run support, and approval requirement;
-  `ToolService` is the only caller of `Tool.execute` and enforces approval structurally.
-  See `docs/adr/0004-controlled-tool-execution.md`.
-- Decisions that recommend an architecture, and decisions that approve a specific destructive
-  operation, are tracked separately (`docs/adr/0003-human-approval-gates.md`).
-- Every decision-bearing structure (assessment, requirements, recommendations, architecture,
-  plan, Terraform plan risk, diagnosis) is produced deterministically by this platform's own
-  services; the LLM only ever produces freeform explanation text
-  (`docs/adr/0008-structured-ai-output.md`). `MockLLMProvider` (used by default) proves every
-  decision is correct with zero AI calls.
+  (`tools/base.py`) with declared risk level, dry-run support, and approval
+  requirement; `ToolService` is the only caller of `Tool.execute` and enforces
+  approval structurally. See `docs/adr/0004-controlled-tool-execution.md`.
+- Decisions that recommend an architecture, and decisions that approve a
+  specific destructive operation, are tracked separately
+  (`docs/adr/0003-human-approval-gates.md`).
+- Every decision-bearing structure (assessment, requirements, recommendations,
+  architecture, plan, Terraform plan risk, diagnosis) is produced
+deterministically by this platform's own services; the LLM only ever produces
+freeform explanation text (`docs/adr/0008-structured-ai-output.md`).
+  `MockLLMProvider` (used by default) proves every decision is correct with zero
+  AI calls.
 
 ## Repository layout
 
-- `src/devops_learn/` the platform: project analysis, requirements/questions/recommendations/
-  architecture/planning services, controlled tools, cloud abstraction, explainability, audit,
-  approvals, experience tracking, CLI.
-- `projects/api_platform/` a real, runnable FastAPI application used as the example project for
-  analysis — separate from the platform's own code.
+- `src/devops_learn/` the platform: project analysis,
+  requirements/questions/recommendations/architecture/planning services,
+  controlled tools, cloud abstraction, explainability, audit, approvals,
+  experience tracking, learner profile, CLI.
+- `projects/api_platform/` a real, runnable FastAPI application used as the
+  example project for analysis — separate from the platform's own code.
 - `templates/` reference Dockerfile, Terraform, Kubernetes, and GitHub Actions files.
-- `docs/` architecture, cloud model, safety boundary, roadmap, and ADRs.
-- `tests/` unit and workflow tests for the platform; `projects/api_platform/tests/` tests the
-  demo app itself.
+- `docs/` architecture, learning model, cloud model, safety boundary, roadmap,
+  and ADRs.
+- `tests/` unit and workflow tests for the platform; `projects/api_platform/tests/`
+  tests the demo app itself.
 
 ## Documentation
 
-- `docs/architecture.md` service architecture, the core workflow, and the modular monolith
-  rationale.
+- `docs/learning-model.md` the AI-assisted mastery philosophy, learner profile,
+  and just-in-time learning approach.
+- `docs/architecture.md` service architecture, the core workflow, and the
+  modular monolith rationale.
 - `docs/cloud-model.md` the concept-first, multi-cloud abstraction.
 - `docs/safety.md` simulation vs. real execution, approval gating, risk levels.
-- `docs/roadmap.md` the next three milestones toward real execution.
+- `docs/roadmap.md` the next milestones.
 - `docs/adr/` architecture decision records.
 
 ## Development

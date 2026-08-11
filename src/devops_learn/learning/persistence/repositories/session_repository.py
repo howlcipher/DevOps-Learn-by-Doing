@@ -10,8 +10,8 @@ from devops_learn.domain.enums import (
     CloudProviderKind,
     CostPriority,
     EnvironmentKind,
+    ExecutionMode,
     ExplanationDepth,
-    OperatingMode,
 )
 from devops_learn.domain.session_models import EngagementSession
 
@@ -70,7 +70,7 @@ def _row_to_session(row: sqlite3.Row) -> EngagementSession:
     return EngagementSession(
         id=row["id"],
         project_root=row["project_root"],
-        mode=OperatingMode(row["mode"]),
+        mode=ExecutionMode(row["mode"]),
         explanation_depth=ExplanationDepth[row["explanation_depth"]],
         cloud=CloudProviderKind(row["cloud"]),
         environment=EnvironmentKind(row["environment"]),

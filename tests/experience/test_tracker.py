@@ -9,10 +9,10 @@ from devops_learn.learning.persistence.repositories.experience_repository import
 
 def test_summary_groups_entries_by_concept(conn: sqlite3.Connection, seeded_session: int) -> None:
     tracker = ExperienceTracker(ExperienceRepository(conn))
-    tracker.record(seeded_session, "Docker", "Reviewed Dockerfile", ExperienceState.OBSERVED)
-    tracker.record(seeded_session, "Docker", "Built image", ExperienceState.PARTICIPATED)
+    tracker.record(seeded_session, "Docker", "Reviewed Dockerfile", ExperienceState.INTRODUCED)
+    tracker.record(seeded_session, "Docker", "Built image", ExperienceState.PRACTICED)
     tracker.record(
-        seeded_session, "Terraform", "Reviewed generated Terraform", ExperienceState.OBSERVED
+        seeded_session, "Terraform", "Reviewed generated Terraform", ExperienceState.INTRODUCED
     )
 
     summary = tracker.summary(seeded_session)
@@ -24,9 +24,9 @@ def test_recording_the_same_item_twice_updates_rather_than_duplicates(
     conn: sqlite3.Connection, seeded_session: int
 ) -> None:
     tracker = ExperienceTracker(ExperienceRepository(conn))
-    tracker.record(seeded_session, "Docker", "Built image", ExperienceState.OBSERVED)
-    tracker.record(seeded_session, "Docker", "Built image", ExperienceState.PARTICIPATED)
+    tracker.record(seeded_session, "Docker", "Built image", ExperienceState.INTRODUCED)
+    tracker.record(seeded_session, "Docker", "Built image", ExperienceState.PRACTICED)
 
     summary = tracker.summary(seeded_session)
     assert len(summary["Docker"]) == 1
-    assert summary["Docker"][0].state == ExperienceState.PARTICIPATED
+    assert summary["Docker"][0].state == ExperienceState.PRACTICED

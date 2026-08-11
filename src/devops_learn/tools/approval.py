@@ -68,3 +68,22 @@ class AutoDenyApprovalGate(ApprovalGate):
         self, operation_name: str, risk_level: RiskLevel, params: Mapping[str, Any]
     ) -> ApprovalRecord:
         return ApprovalRecord(granted=False, approved_by="test-auto-deny")
+
+
+class ThresholdApprovalGate(ApprovalGate):
+    """Wraps another gate and only prompts when risk is at least a threshold.
+
+    Useful for GUIDED mode, where even LOW-risk operations should be confirmed.
+    """
+
+    def __init__(self, inner: ApprovalGate, threshold: RiskLevel) -> None:
+        self._inner = inner
+        self._order = (RiskLevel.SAFE, RiskLevel.LOW, RiskLevel.HIGH, RiskLevel.DESTRUCTIVE)
+        self._threshold_index = self._order.index(threshold)
+
+    def request(
+        self, operation_name: str, risk_level: RiskLevel, params: Mapping[str, Any]
+    ) -> ApprovalRecord:
+        if self._order.index(risk_level) < self._threshold_index:
+            return ApprovalRecord(granted=True, approved_by="auto-below-threshold")
+        return self._inner.request(operation_name, risk_level, params)

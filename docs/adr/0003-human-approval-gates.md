@@ -17,8 +17,9 @@ Two independent approval concerns exist:
 1. **Tool-level approval** (`tools/approval.py`): every `ToolOperationSpec` carries
    `risk_level`, `requires_approval`, and `is_destructive`. `ToolService.invoke` is the only
    caller of `Tool.execute`, and it refuses to run an operation that requires approval without
-   first getting a granted `ApprovalRecord` from an `ApprovalGate`. `OperatingMode.AUTOPILOT`
-   changes how much is explained around a call, never whether approval is required.
+   first getting a granted `ApprovalRecord` from an `ApprovalGate`. `ExecutionMode` changes who
+   performs the work and how much is explained around a call, never whether approval is
+   required.
 2. **Decision-level approval** (`approvals/decision_service.py`): accepting, rejecting, or
    modifying a `Recommendation`, and answering a `ClarifyingQuestion`, are human decisions about
    architecture and tradeoffs, not about one tool call. These are recorded separately as
@@ -34,5 +35,8 @@ Two independent approval concerns exist:
 
 - No mode can bypass tool-level approval for a HIGH or DESTRUCTIVE risk operation; this is
   enforced in `ToolService`, not left to each workflow to remember.
+- `Guided` mode can auto-approve SAFE/LOW-risk operations through `ThresholdApprovalGate` to
+  keep the human in the loop without pointless prompts, but mandatory approvals still apply at
+  HIGH/DESTRUCTIVE.
 - The audit log can distinguish "the user decided to use managed identity" from "the user
   approved this specific `terraform apply`."

@@ -69,3 +69,9 @@ CREATE TABLE IF NOT EXISTS artifacts (
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_session
     ON artifacts(session_id);
+
+CREATE TABLE IF NOT EXISTS learner_profiles (
+    id INTEGER PRIMARY KEY,
+    proficiencies_json TEXT NOT NULL,
+    focus_json TEXT NOT NULL
+);

@@ -469,7 +469,7 @@
       </a>
       <nav class="nav-links" aria-label="Primary navigation">
         <a href="#model">Learning model</a>
-        <a href="#status">V1 status</a>
+        <a href="#status">Status</a>
         <a href="#roadmap">Roadmap</a>
         <a class="repo-link" href="https://github.com/howlcipher/DevOps-Learn-by-Doing">GitHub ↗</a>
       </nav>
@@ -479,12 +479,13 @@
   <main id="main">
     <div class="shell hero" id="top">
       <div class="hero-copy">
-        <div class="eyebrow">Systems Training Division // V1 Skeleton</div>
+        <div class="eyebrow">AI-Assisted DevOps Mastery // V1 Skeleton</div>
         <h1>Learn DevOps by doing the work.</h1>
         <p>
-          A CLI learning platform built around a real production-style Python API project.
-          The AI mentor <strong>explains, hints, reviews, then gets out of your way</strong>
-          so progress means you can actually perform the work—not just watch it happen.
+          A CLI learning and engineering platform built around a real production-style Python API project.
+          The AI <strong>works with you, explains what matters, and never pretends to know</strong>
+          what it has not actually done. Progress means you can direct, review, troubleshoot,
+          and improve AI-assisted infrastructure—not type every command from memory.
         </p>
         <div class="actions">
           <a class="button" href="https://github.com/howlcipher/DevOps-Learn-by-Doing">View source ↗</a>
@@ -498,16 +499,17 @@
           <span class="window-controls" aria-hidden="true"><span></span><span></span><span></span></span>
         </div>
         <div class="terminal">
-          <p><span class="dim">C:\LEARN&gt;</span> devops-learn start --simulation</p>
+          <p><span class="dim">C:\LEARN&gt;</span> devops-learn local projects/api_platform</p>
           <p class="info">[SYSTEM] Production-Style API Platform</p>
           <p>[LANG] Python</p>
+          <p>[DOCKER] <span class="info">(real)</span></p>
           <p>[CLOUD] Azure <span class="warn">(simulated)</span></p>
-          <p>[MODE] Progressive assistance enabled</p>
-          <p>[TRACK] Git → Tests → Docker → CI/CD → Terraform</p>
-          <p class="dim">        → Azure → Kubernetes → Observability</p>
+          <p>[MODE] Collaborative + learning depth</p>
+          <p>[TRACK] Inspect → Tests → Lint → Docker → Verify</p>
+          <p class="dim">        → Terraform → Azure → Kubernetes</p>
           <p class="dim">        → Failure → Troubleshoot → Rollback</p>
-          <p>[GOAL] Demonstrate competency without hints</p>
-          <p class="info">[READY] No cloud credentials required.</p>
+          <p>[GOAL] Understand enough to direct and review the AI</p>
+          <p class="info">[READY] No cloud credentials required for local work.</p>
           <p><span class="dim">C:\LEARN&gt;</span> <span class="cursor" aria-hidden="true"></span></p>
         </div>
       </div>
@@ -517,29 +519,30 @@
       <div class="shell">
         <div class="section-head">
           <div class="label">01 // Learning model</div>
-          <h2>AI assistance should fade as skill grows.</h2>
+          <h2>AI-assisted DevOps mastery.</h2>
           <p>
-            The system is designed around independence: show, explain, help, hint, review,
-            then let the learner perform the task without assistance.
+            The AI and the human do real engineering work together. The platform explains
+            concepts in context, targets gaps in the learner profile, and treats competency as
+            the ability to direct, review, troubleshoot, and improve AI-generated work.
           </p>
         </div>
 
         <div class="grid levels">
           <article class="card level" data-level="1">
-            <h3>Guided</h3>
-            <p>WHY, WHAT, and HOW are shown proactively. The learner sees the full shape of the task.</p>
+            <h3>Observe</h3>
+            <p>AI analyzes and explains. No changes are made. Useful for understanding a project.</p>
           </article>
           <article class="card level" data-level="2">
-            <h3>Assisted</h3>
-            <p>WHY and WHAT stay visible. HOW is withheld until the learner asks or needs a hint.</p>
+            <h3>Guided</h3>
+            <p>AI explains the next step; the human performs meaningful actions and learns by doing.</p>
           </article>
           <article class="card level" data-level="3">
-            <h3>Challenge</h3>
-            <p>The learner predicts first, performs more independently, and earns deeper help through hints.</p>
+            <h3>Collaborative</h3>
+            <p>AI generates and performs substantial work while involving the human in decisions.</p>
           </article>
           <article class="card level" data-level="4">
-            <h3>Independent</h3>
-            <p>Minimal proactive content. Demonstrated competency requires a successful unhinted attempt.</p>
+            <h3>AI-Executed / Autonomous</h3>
+            <p>AI performs approved work and narrates what, why, risks, and rollback. Destructive or costly actions still require human approval.</p>
           </article>
         </div>
 
@@ -591,30 +594,30 @@
       <div class="shell split">
         <div>
           <div class="section-head">
-            <div class="label">03 // Truthful V1 status</div>
-            <h2>Real learning target. Simulated infrastructure execution.</h2>
+            <div class="label">03 // Truthful status</div>
+            <h2>Real local execution. Simulated cloud.</h2>
             <p>
-              The boundary is deliberate. V1 teaches the concepts and workflow without pretending
-              it is already a live cloud automation platform.
+              The boundary is deliberate: local Python and Docker work is real, while Azure,
+              Terraform apply, and Kubernetes remain simulated until the next milestone.
             </p>
           </div>
 
           <div class="status-list">
             <div class="status-row">
               <span class="badge real">Real</span>
+              <p>Project analysis, learner profile, SQLite persistence, audit, and experience tracking.</p>
+            </div>
+            <div class="status-row">
+              <span class="badge real">Real</span>
+              <p>Local vertical slice: pytest, flake8, docker build/run/logs/stop, and HTTP health checks.</p>
+            </div>
+            <div class="status-row">
+              <span class="badge real">Real</span>
               <p>The demo FastAPI application and its tests are runnable code.</p>
             </div>
             <div class="status-row">
-              <span class="badge real">Real</span>
-              <p>Reference Dockerfile, Terraform, Kubernetes, and GitHub Actions configurations are valid examples.</p>
-            </div>
-            <div class="status-row">
-              <span class="badge real">Real</span>
-              <p>SQLite persistence, learning history, competency tracking, and resume state are implemented.</p>
-            </div>
-            <div class="status-row">
               <span class="badge sim">Sim</span>
-              <p>Docker, Terraform, kubectl, cloud API calls, and even Git operations are simulated in V1.</p>
+              <p>Azure provisioning, Terraform apply, kubectl, and cloud API calls are simulated.</p>
             </div>
           </div>
         </div>
@@ -655,7 +658,7 @@
         <div class="grid roadmap">
           <article class="card">
             <h3>Real Python + Docker</h3>
-            <p>Run pytest, flake8, and the local Docker daemon through narrow allow-listed subprocess wrappers.</p>
+            <p><span class="badge real" style="display:inline-block">Done</span> Run pytest, flake8, and the local Docker daemon through narrow allow-listed subprocess wrappers.</p>
           </article>
           <article class="card">
             <h3>Real Terraform validation</h3>
@@ -680,10 +683,16 @@
             <p><span class="dim"># install the project and development dependencies</span></p>
             <p>pip install -e ".[dev]"</p>
             <br>
-            <p><span class="dim"># start the simulation-first learning experience</span></p>
-            <p>devops-learn start --simulation</p>
+            <p><span class="dim"># set your learner profile</span></p>
+            <p>devops-learn profile --set docker=strong terraform=beginner</p>
             <br>
-            <p class="info">Other commands: resume · progress · projects · competencies · explain</p>
+            <p><span class="dim"># run a real local vertical slice</span></p>
+            <p>devops-learn local projects/api_platform</p>
+            <br>
+            <p><span class="dim"># simulate the full cloud workflow</span></p>
+            <p>devops-learn analyze projects/api_platform --mode collaborative --depth learning</p>
+            <br>
+            <p class="info">Other commands: init · review · history · explain</p>
           </div>
         </div>
       </div>
@@ -692,7 +701,7 @@
 
   <footer>
     <div class="shell footer-row">
-      <span>DEVOPS LEARN BY DOING // SIMULATION-FIRST V1</span>
+      <span>DEVOPS LEARN BY DOING // AI-ASSISTED MASTERY V1</span>
       <span>
         <a href="https://github.com/howlcipher/DevOps-Learn-by-Doing">Repository</a>
         &nbsp;·&nbsp;

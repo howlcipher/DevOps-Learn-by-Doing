@@ -6,7 +6,7 @@ import argparse
 
 from devops_learn.bootstrap import Platform
 from devops_learn.cli.terminal_ui import TerminalUi
-from devops_learn.domain.enums import CloudProviderKind, ExplanationDepth, OperatingMode
+from devops_learn.domain.enums import CloudProviderKind, ExecutionMode, ExplanationDepth
 from devops_learn.workflows.analyze_flow import AnalyzeOptions, run_analysis
 
 
@@ -26,7 +26,7 @@ def register(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") 
 def run(args: argparse.Namespace, platform: Platform) -> None:
     options = AnalyzeOptions(
         project_root=args.path,
-        mode=OperatingMode.REVIEW,
+        mode=ExecutionMode.OBSERVE,
         explanation_depth=ExplanationDepth.NORMAL,
         cloud=CloudProviderKind.AZURE,
         environment=None,

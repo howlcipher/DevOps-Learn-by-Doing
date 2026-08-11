@@ -10,15 +10,15 @@ from devops_learn.domain.enums import (
     CloudProviderKind,
     CostPriority,
     EnvironmentKind,
+    ExecutionMode,
     ExplanationDepth,
-    OperatingMode,
 )
 
 
 @dataclass(frozen=True)
 class EngagementSession:
     project_root: str
-    mode: OperatingMode
+    mode: ExecutionMode
     explanation_depth: ExplanationDepth
     cloud: CloudProviderKind
     environment: EnvironmentKind

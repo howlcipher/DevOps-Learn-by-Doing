@@ -8,8 +8,8 @@ from devops_learn.domain.enums import (
     CostPriority,
     EnvironmentKind,
     ExperienceState,
+    ExecutionMode,
     ExplanationDepth,
-    OperatingMode,
 )
 from devops_learn.domain.experience_models import ExperienceEntry
 from devops_learn.domain.project_models import Artifact
@@ -33,7 +33,7 @@ NOW = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
 def _make_session() -> EngagementSession:
     return EngagementSession(
         project_root="/tmp/example",
-        mode=OperatingMode.COLLABORATE,
+        mode=ExecutionMode.COLLABORATIVE,
         explanation_depth=ExplanationDepth.LEARNING,
         cloud=CloudProviderKind.AZURE,
         environment=EnvironmentKind.DEV,
@@ -118,7 +118,7 @@ def test_experience_entries_upsert_by_concept_and_item(conn: sqlite3.Connection)
             session_id=session.id,
             concept="Terraform",
             item="Reviewed generated Terraform",
-            state=ExperienceState.OBSERVED,
+            state=ExperienceState.INTRODUCED,
             occurred_at=NOW,
         )
     )
@@ -127,13 +127,13 @@ def test_experience_entries_upsert_by_concept_and_item(conn: sqlite3.Connection)
             session_id=session.id,
             concept="Terraform",
             item="Reviewed generated Terraform",
-            state=ExperienceState.PARTICIPATED,
+            state=ExperienceState.PRACTICED,
             occurred_at=NOW,
         )
     )
     entries = repo.list_for_session(session.id)
     assert len(entries) == 1
-    assert entries[0].state == ExperienceState.PARTICIPATED
+    assert entries[0].state == ExperienceState.PRACTICED
 
 
 def test_artifact_created_and_listed(conn: sqlite3.Connection) -> None:

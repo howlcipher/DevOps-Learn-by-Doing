@@ -22,6 +22,8 @@ workflows/analyze_flow.py   sequences the services below for one engagement; no 
     +-- audit.AuditService              the append-only audit_events journal
     +-- approvals.DecisionService       records human decisions on questions/recommendations
     +-- learning.SessionService         EngagementSession lifecycle
+    +-- learning.LearnerProfileService  stores skill profile and learning focus
+    +-- workflows.local_flow            real local vertical slice (test -> Docker -> verify)
     +-- ai.LLMProvider                  MockLLMProvider (default) or AnthropicProvider
 ```
 
@@ -40,11 +42,15 @@ Project -> ProjectAnalyzer -> RequirementsService -> QuestionService (human deci
     -> health verification -> TroubleshootingService (on failure) -> AuditService/ExperienceTracker
 ```
 
-`OperatingMode.REVIEW` stops after `RequirementsService` and produces a prioritized roadmap;
-nothing is built. The other three modes (`LEARN`, `COLLABORATE`, `AUTOPILOT`) run the full
-workflow, differing only in how much they ask versus explain (`ExplanationService`,
-`docs/adr/0002-explainable-ai-workflow.md`) — never in whether a HIGH/DESTRUCTIVE tool operation
-requires approval (`docs/adr/0003-human-approval-gates.md`).
+`ExecutionMode.OBSERVE` stops after requirements/architecture and produces a prioritized roadmap;
+nothing is built. The other modes (`GUIDED`, `COLLABORATIVE`, `AI_EXECUTED`, `AUTONOMOUS`) run
+the full workflow, differing in how much the human performs versus how much the AI performs —
+never in whether a HIGH/DESTRUCTIVE tool operation requires approval
+(`docs/adr/0003-human-approval-gates.md`).
+
+`workflows/local_flow.py` implements a separate real local vertical slice (`devops-learn local`):
+inspect -> test -> lint -> Docker build -> run -> HTTP verify -> logs -> stop. It uses real
+`python` and `docker` tools while keeping cloud/Terraform/Kubernetes simulated.
 
 ## Layers
 
@@ -53,7 +59,7 @@ domain/           plain dataclasses and enums; no behavior, no I/O
 analysis/         ProjectAnalyzer: real filesystem/text inspection, no execution
 requirements/, questions/, recommendations/, architecture/, planning/, validation/
                   deterministic decision services; see docs/adr/0008-structured-ai-output.md
-tools/            the controlled tool interface + simulated implementations
+tools/            the controlled tool interface + simulated and real implementations
 troubleshooting/  gathers ToolResult-derived evidence, then diagnoses
 ai/               LLMProvider abstraction + Mock/Anthropic implementations (explanation only)
 cloud/            concept-first extension points (Azure implemented; AWS/GCP stubs)

@@ -17,6 +17,7 @@ from devops_learn.cloud.azure.provider import AzureProvider
 from devops_learn.cloud.base.provider import CloudProvider
 from devops_learn.experience.tracker import ExperienceTracker
 from devops_learn.explanations.service import ExplanationService
+from devops_learn.learning.learner_profile_service import LearnerProfileService
 from devops_learn.learning.persistence.migrations import ensure_schema
 from devops_learn.learning.persistence.repositories.artifact_repository import (
     ArtifactRepository,
@@ -28,6 +29,9 @@ from devops_learn.learning.persistence.repositories.decision_repository import (
 from devops_learn.learning.persistence.repositories.experience_repository import (
     ExperienceRepository,
 )
+from devops_learn.learning.persistence.repositories.learner_profile_repository import (
+    LearnerProfileRepository,
+)
 from devops_learn.learning.persistence.repositories.session_repository import SessionRepository
 from devops_learn.learning.session_service import SessionService
 from devops_learn.planning.service import PlanningService
@@ -36,6 +40,7 @@ from devops_learn.requirements.service import RequirementsService
 from devops_learn.questions.service import QuestionService
 from devops_learn.tools.approval import ApprovalGate, CliApprovalGate
 from devops_learn.tools.cloud_tool import SimulatedCloudTool
+from devops_learn.tools.base import Tool
 from devops_learn.tools.docker_tool import SimulatedDockerTool
 from devops_learn.tools.git_tool import SimulatedGitTool
 from devops_learn.tools.kubernetes_tool import SimulatedKubernetesTool
@@ -62,6 +67,7 @@ class Platform:
     decision_service: DecisionService
     experience_tracker: ExperienceTracker
     artifact_repository: ArtifactRepository
+    learner_profile_service: LearnerProfileService
     llm: LLMProvider
 
 
@@ -71,6 +77,7 @@ def build_platform(
     llm_provider: LLMProvider | None = None,
     approval_gate: ApprovalGate | None = None,
     cloud_provider: CloudProvider | None = None,
+    tools: dict[str, Tool] | None = None,
 ) -> Platform:
     ensure_schema(conn)
 
@@ -80,12 +87,14 @@ def build_platform(
     decision_service = DecisionService(DecisionRepository(conn))
     experience_tracker = ExperienceTracker(ExperienceRepository(conn))
     artifact_repository = ArtifactRepository(conn)
+    learner_profile_service = LearnerProfileService(LearnerProfileRepository(conn))
 
     llm = llm_provider or MockLLMProvider()
     cloud = cloud_provider or AzureProvider()
 
     tool_service = ToolService(
-        {
+        tools
+        or {
             "python": SimulatedPythonTool(),
             "git": SimulatedGitTool(),
             "docker": SimulatedDockerTool(),
@@ -112,5 +121,6 @@ def build_platform(
         decision_service=decision_service,
         experience_tracker=experience_tracker,
         artifact_repository=artifact_repository,
+        learner_profile_service=learner_profile_service,
         llm=llm,
     )

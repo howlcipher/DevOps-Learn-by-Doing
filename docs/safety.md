@@ -1,26 +1,27 @@
 # Safety: simulation vs. real, and controlled tool execution
 
-## What is real in V1
+## What is real
 
 - `ProjectAnalyzer` performs a real, read-only inspection of whatever repository path it is
   given (including this repo's own `projects/api_platform/`): real file presence checks, real
   regex scans of real file contents. It executes nothing.
 - The demo FastAPI application (`projects/api_platform/`) is real, runnable code with real
-  tests: `pip install -r requirements.txt && uvicorn app.main:app` actually runs it.
+  tests.
+- `devops-learn local <path>` runs real `pytest`, `flake8`, `docker build`, `docker run`,
+  `docker logs`, and `docker stop` against the project you provide, and performs a real HTTP
+  health check against the running container.
+- The platform's own persistence (SQLite), audit log, decisions, experience tracking, and learner
+  profile are real.
 - The reference Dockerfile, Terraform configuration, Kubernetes manifest, and GitHub Actions
   workflow under `templates/` are real, valid configuration files, shown as examples.
-- The platform's own persistence (SQLite), audit log, decisions, and experience tracking are
-  real.
 
-## What is simulated in V1
+## What is simulated
 
-Every `Tool` implementation (`tools/*_tool.py`) is a `Simulated*Tool`: no `subprocess` calls, no
-Docker daemon, no Terraform binary, no `kubectl`, no real Azure/AWS/GCP API calls, no network
-access. This includes objectively low-risk operations like `git status`, kept simulated for one
-unambiguous boundary rather than deciding operation by operation. Every simulated result's
-summary text is marked "(simulated)". `devops-learn analyze <path>` runs in simulation mode with
-zero cloud credentials; the one intentional deployment failure and its diagnosis
-(`troubleshooting/service.py`) are also simulated, clearly narrated as such.
+- `devops-learn analyze` (without `--real-tools`) and `devops-learn review` use simulated
+  Docker/Terraform/Kubernetes/cloud execution. No subprocess calls, no Docker daemon, no Terraform
+  binary, no `kubectl`, no real Azure/AWS/GCP API calls, no outbound cloud provisioning. Every
+  simulated result's summary text is marked "(simulated)".
+- The intentional Kubernetes readiness-probe failure and diagnosis in `analyze` are simulated.
 
 `SimulatedTerraformTool.plan()` derives its resource count by parsing
 `templates/terraform/main.tf.reference`'s `resource` blocks rather than hardcoding a number, and
@@ -46,8 +47,18 @@ When an operation requires approval and is not a dry run, `ToolService` blocks o
 `ApprovalGate.request` before the tool's `execute` runs at all; `CliApprovalGate` is the only
 gate wired into the real CLI, prompting the human directly in the terminal.
 `AutoApproveApprovalGate`/`AutoDenyApprovalGate` exist only for tests. This holds in every
-`OperatingMode`, including `AUTOPILOT`: mode only changes how much is explained around a call,
-never whether approval is required (`docs/adr/0003-human-approval-gates.md`).
+`ExecutionMode`: mode only changes how much is explained or who performs the work, never whether
+approval is required (`docs/adr/0003-human-approval-gates.md`).
+
+## Real local execution safety
+
+`devops-learn local` only runs local tools (`python` and `docker`). It never provisions cloud
+resources, applies Terraform, or modifies remote state. It:
+
+- builds and runs a container on your local Docker daemon,
+- maps a host port (default `8000`) to the container,
+- stops the container at the end of the workflow,
+- clearly labels every real result with `(real)`.
 
 ## Terraform plan risk
 
@@ -57,12 +68,12 @@ never whether approval is required (`docs/adr/0003-human-approval-gates.md`).
 replacement whenever the chosen environment is `PRODUCTION`, so a production run visibly produces
 a HIGH-risk plan.
 
-## Destructive operations in V1's tool catalog
+## Destructive operations in the tool catalog
 
 `terraform.destroy_approved_environment`, `kubernetes.delete_namespace`,
 `cloud.remove_identity`, `cloud.delete_resource_group`. All require approval; none support a
 dry-run bypass. `docker.remove_image` and `kubernetes.rollback` are HIGH risk (recoverable) and
-do support a dry run that skips approval, since nothing real is destroyed either way in V1.
+do support a dry run that skips approval when the operation is simulated.
 
 ## Cost awareness
 

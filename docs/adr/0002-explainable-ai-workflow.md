@@ -14,7 +14,7 @@ structured concept, not an incidental side effect of prose the AI happens to gen
 
 Model explanations as a fixed structure (`domain/explanation_models.Explanation`): ACTION, WHY,
 DECISION, ALTERNATIVES, TRADEOFF, WHAT_TO_UNDERSTAND, RESULT. `ExplanationService` renders this
-structure as text, scaled by `OperatingMode` (how much interaction happens) and
+structure as text, scaled by `ExecutionMode` (who performs the work) and
 `ExplanationDepth` (how deep any rendered explanation goes) — two independent axes. Recurring
 concept explanations that are triggered by a specific action use the related but distinct
 `LearningMoment` structure.
@@ -30,5 +30,5 @@ concept explanations that are triggered by a specific action use the related but
 
 - Every explanation call site fills in only the fields that apply; trivial actions render as one
   line rather than a padded template.
-- Mode and depth can be changed independently: "Autopilot mode with deep explanations if I ask"
-  is representable, per the product spec's example.
+- Mode and depth can be changed independently: "AI-executed mode with deep explanations" and
+  "collaborative mode with brief explanations" are both representable.

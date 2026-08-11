@@ -10,8 +10,8 @@ from devops_learn.domain.enums import (
     CloudProviderKind,
     CostPriority,
     EnvironmentKind,
+    ExecutionMode,
     ExplanationDepth,
-    OperatingMode,
 )
 from devops_learn.workflows.analyze_flow import AnalyzeOptions, run_analysis
 
@@ -23,8 +23,9 @@ def register(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") 
     parser.add_argument("path", help="Path to the project to analyze")
     parser.add_argument(
         "--mode",
-        choices=[m.value for m in OperatingMode],
-        default=OperatingMode.COLLABORATE.value,
+        choices=[m.value for m in ExecutionMode],
+        default=ExecutionMode.COLLABORATIVE.value,
+        help="Execution mode: observe, guided, collaborative, ai_executed, autonomous",
     )
     parser.add_argument(
         "--depth",
@@ -54,7 +55,7 @@ def register(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") 
 def run(args: argparse.Namespace, platform: Platform) -> None:
     options = AnalyzeOptions(
         project_root=args.path,
-        mode=OperatingMode(args.mode),
+        mode=ExecutionMode(args.mode),
         explanation_depth=ExplanationDepth[args.depth.upper()],
         cloud=CloudProviderKind(args.cloud),
         environment=EnvironmentKind(args.environment) if args.environment else None,
