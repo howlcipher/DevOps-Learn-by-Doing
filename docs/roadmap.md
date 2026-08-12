@@ -26,15 +26,20 @@ allow-listed subprocess wrapper, gated by `ToolService.invoke`.
 offline/no-Docker environments. The `devops-learn local` command runs the full
 local vertical slice end to end and teaches Docker concepts in context.
 
-## Milestone 2: real Terraform workflow
+## Milestone 2: real Terraform workflow (done)
 
-Add `RealTerraformTool` shelling out to a real `terraform` binary for
-`fmt`/`validate`/`plan` against generated configuration, with structured
-parsing of `terraform show -json` feeding the existing
-`validation/terraform_plan_analysis.analyze()` risk classifier unchanged. No
-`apply` and no Azure credentials required yet;
-`apply_approved_plan`/`destroy_approved_environment` stay simulated until
-Milestone 3.
+`RealTerraformTool` (`tools/terraform_tool.py`) shells out to a real
+`terraform` binary for `fmt`/`init`/`validate`/`plan` against a real,
+committed configuration (`projects/api_platform/infra/terraform/`), with
+structured parsing of `terraform show -json` feeding the existing
+`validation/terraform_plan_analysis.analyze()` risk classifier unchanged.
+`devops-learn terraform` runs the full vertical slice (fmt -> init ->
+validate -> plan -> risk analysis) and teaches Terraform state, provider,
+and resource-address concepts just-in-time (`docs/terraform-state.md`). No
+`apply`; `apply_approved_plan`/`destroy_approved_environment` are not even
+declared on `RealTerraformTool` and stay simulated until Milestone 3. `plan`
+requires Azure authentication and fails cleanly, with an explanation, on a
+machine without it — `init`/`validate`/`fmt` need no credentials.
 
 ## Milestone 3: first Azure vertical slice
 

@@ -10,6 +10,13 @@
 - `devops-learn local <path>` runs real `pytest`, `flake8`, `docker build`, `docker run`,
   `docker logs`, and `docker stop` against the project you provide, and performs a real HTTP
   health check against the running container.
+- `devops-learn terraform` runs real `terraform fmt`, `init`, `validate`, and `plan` (including
+  `terraform show -json`) against `projects/api_platform/infra/terraform/`. It never applies or
+  destroys anything. `init` downloads the `azurerm` provider plugin (network access, no Azure
+  credentials required); `plan` requires Azure authentication (`az login`, or
+  `ARM_CLIENT_ID`/`ARM_CLIENT_SECRET`/`ARM_TENANT_ID`/`ARM_SUBSCRIPTION_ID`) to build the
+  provider client and fails cleanly, with an explanation, without it — see "Real Terraform
+  execution" below.
 - The platform's own persistence (SQLite), audit log, decisions, experience tracking, and learner
   profile are real.
 - The reference Dockerfile, Terraform configuration, Kubernetes manifest, and GitHub Actions
@@ -59,6 +66,27 @@ resources, applies Terraform, or modifies remote state. It:
 - maps a host port (default `8000`) to the container,
 - stops the container at the end of the workflow,
 - clearly labels every real result with `(real)`.
+
+## Real Terraform execution
+
+`devops-learn terraform` is the only command that uses `RealTerraformTool`
+(`tools/terraform_tool.py`) — `devops-learn analyze --real-tools` and `devops-learn local` both
+still use `SimulatedTerraformTool` for the `terraform` tool name; only `python`/`docker` become
+real for those commands. `RealTerraformTool` declares only `fmt`/`init`/`validate`/`plan` —
+`apply_approved_plan`/`destroy_approved_environment` are not implemented on it at all, so
+invoking either raises `KeyError` rather than silently falling back to simulated behavior. Real
+apply/destroy stay simulated until Milestone 3 (`docs/roadmap.md`).
+
+Every subprocess call goes through `tools/_subprocess_safety.py::run_safely`, which sets an
+explicit timeout and always redacts secret-shaped `KEY=value` text and truncates long output
+before it reaches a `ToolResult`. `plan()`'s parsing of `terraform show -json` never extracts
+raw resource attribute values (`before`/`after`) — only `{address, action}` per resource change
+— which is the primary defense against leaking sensitive plan data; free-text redaction is
+defense in depth on top of that.
+
+A `terraform plan` failure due to missing Azure credentials is an expected, honest outcome on a
+machine with no `az login`/`ARM_*` environment variables configured — `workflows/terraform_flow.py`
+diagnoses it explicitly rather than treating it as a bug, and never fabricates a successful plan.
 
 ## Terraform plan risk
 

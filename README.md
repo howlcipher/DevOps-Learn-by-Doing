@@ -24,8 +24,14 @@ Project -> Analysis -> Requirements -> Questions -> Recommendations -> Architect
   questions that cannot be inferred safely.
 - **Real local execution** (`devops-learn local`) runs actual `pytest`, `flake8`,
   `docker build`, `docker run`, and HTTP health checks against the project.
-- **Simulated cloud/Terraform/Kubernetes** execution for safe learning without
-  credentials or cost (`devops-learn analyze` without `--real-tools`).
+- **Real Terraform execution** (`devops-learn terraform`) runs actual
+  `terraform fmt`/`init`/`validate`/`plan` against a real, committed Azure
+  configuration, with structured `terraform show -json` parsing feeding a
+  deterministic risk classifier. No `apply`/`destroy` yet; `plan` requires
+  Azure authentication and fails cleanly, with an explanation, without it.
+- **Simulated cloud/Kubernetes** execution for safe learning without
+  credentials or cost (`devops-learn analyze` without `--real-tools`;
+  Terraform in `analyze`/`review` also stays simulated).
 - **Controlled tool execution**: every capability is a `Tool` with declared
   risk level, dry-run support, and human approval; `ToolService` is the only
   caller of `Tool.execute`.
@@ -52,6 +58,10 @@ devops-learn init projects/api_platform
 
 # Run a real local vertical slice: test -> lint -> docker build -> run -> verify
 devops-learn local projects/api_platform
+
+# Run a real Terraform vertical slice: fmt -> init -> validate -> plan -> risk analysis
+# (plan requires Azure credentials; fails cleanly with an explanation without them)
+devops-learn terraform
 
 # Simulate the full cloud workflow (no credentials, no cost)
 devops-learn analyze projects/api_platform --mode collaborative --depth learning

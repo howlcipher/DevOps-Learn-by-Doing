@@ -92,6 +92,12 @@ course. When the platform generates or runs Terraform, it explains:
 The depth of each of those points depends on the learner profile and the
 current explanation depth.
 
+`devops-learn terraform` applies this to Terraform state specifically:
+`workflows/terraform_flow.py` surfaces 2-3 state/provider concepts per run,
+tied to the command about to execute, rather than the full picture at once.
+See `docs/terraform-state.md` for the complete reference those moments link
+back to.
+
 ## AI-generated work must be reviewable
 
 Before significant execution the platform shows:
