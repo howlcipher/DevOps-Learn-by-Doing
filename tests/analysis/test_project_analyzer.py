@@ -14,7 +14,9 @@ def test_analyzes_the_bundled_example_project() -> None:
     assert assessment.containerization_status is MaturityStatus.GOOD
     assert assessment.healthcheck_status is MaturityStatus.GOOD
     assert assessment.ci_cd_status is MaturityStatus.MISSING
-    assert assessment.iac_status is MaturityStatus.MISSING
+    # projects/api_platform/infra/terraform/ is real Terraform config as of Milestone 2
+    # (docs/roadmap.md) -- ProjectAnalyzer correctly detects it.
+    assert assessment.iac_status is MaturityStatus.GOOD
 
 
 def test_detects_missing_everything_for_an_empty_project(tmp_path: Path) -> None:

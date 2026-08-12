@@ -13,3 +13,20 @@ htmlcov/
 *.sqlite3
 .env
 .devops_learn/
+
+# Terraform working-directory artifacts (see projects/api_platform/infra/terraform/).
+# .terraform.lock.hcl is deliberately NOT listed here: it pins exact provider
+# versions/hashes so `terraform init` is reproducible across machines and CI,
+# which is normal, recommended Terraform practice -- unlike .terraform/ (a
+# regenerable local plugin cache) and *.tfstate (can contain sensitive values,
+# and since this milestone never applies, would only ever hold stale/empty
+# state if committed).
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
