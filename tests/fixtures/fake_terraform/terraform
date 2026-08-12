@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""A fake `terraform` binary for tests/tools/test_real_terraform_tool.py.
+
+Behavior is selected by the FAKE_TERRAFORM_SCENARIO env var so a single
+script covers every scenario instead of one file per case. Never touches
+real infrastructure; only prints canned output and writes a placeholder
+plan file when asked to `-out=`.
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import time
+
+SCENARIO = os.environ.get("FAKE_TERRAFORM_SCENARIO", "success")
+
+
+def _plan_out_path(args: list[str]) -> str | None:
+    for arg in args:
+        if arg.startswith("-out="):
+            return arg[len("-out="):]
+    return None
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    if not args:
+        return 1
+    subcommand = args[0]
+
+    if SCENARIO == "timeout":
+        time.sleep(5)
+        return 0
+
+    if subcommand == "fmt":
+        if SCENARIO == "fmt_needs_formatting":
+            print("main.tf\n+  location = \"eastus\"", file=sys.stdout)
+            return 3
+        return 0
+
+    if subcommand == "init":
+        if SCENARIO == "init_failure":
+            print("Error: Failed to install provider", file=sys.stderr)
+            return 1
+        print("Terraform has been successfully initialized!")
+        return 0
+
+    if subcommand == "validate":
+        if SCENARIO == "validate_failure":
+            print(json.dumps({
+                "valid": False,
+                "diagnostics": [{"severity": "error", "summary": "Missing required argument"}],
+            }))
+            return 1
+        print(json.dumps({"valid": True, "diagnostics": []}))
+        return 0
+
+    if subcommand == "plan":
+        out_path = _plan_out_path(args)
+        if SCENARIO == "plan_failure_with_secret":
+            # Mirrors real `terraform plan` output observed with no Azure credentials:
+            # a genuine "az login"/"Authorizer" auth failure, with a secret-shaped
+            # value mixed in to also exercise redaction.
+            print(
+                "Error: building AzureRM Client: obtain a token using "
+                "ARM_CLIENT_SECRET=super-secret-value-123 failed: could not configure "
+                "AzureCli Authorizer: obtaining tenant ID: running Azure CLI: exit status 1: "
+                "ERROR: Please run 'az login' to setup account.",
+                file=sys.stderr,
+            )
+            return 1
+        if out_path:
+            with open(out_path, "wb") as handle:
+                handle.write(b"fake-plan-binary-content")
+        return 0
+
+    if subcommand == "show":
+        if SCENARIO == "show_json_malformed":
+            print("{not valid json")
+            return 0
+        if SCENARIO == "plan_with_sensitive_attribute":
+            print(json.dumps({
+                "resource_changes": [
+                    {
+                        "address": "azurerm_resource_group.main",
+                        "change": {"actions": ["create"]},
+                    },
+                    {
+                        "address": "azurerm_key_vault_secret.admin",
+                        "change": {
+                            "actions": ["create"],
+                            "after": {"admin_password": "hunter2"},
+                        },
+                    },
+                ]
+            }))
+            return 0
+        if SCENARIO == "plan_mixed_actions":
+            print(json.dumps({
+                "resource_changes": [
+                    {"address": "azurerm_resource_group.main",
+                     "change": {"actions": ["create"]}},
+                    {"address": "azurerm_container_registry.main",
+                     "change": {"actions": ["update"]}},
+                    {"address": "azurerm_log_analytics_workspace.main",
+                     "change": {"actions": ["delete", "create"]}},
+                    {"address": "azurerm_storage_account.old",
+                     "change": {"actions": ["delete"]}},
+                    {"address": "azurerm_resource_group.untouched",
+                     "change": {"actions": ["no-op"]}},
+                ]
+            }))
+            return 0
+        # default "success" scenario: two creates
+        print(json.dumps({
+            "resource_changes": [
+                {"address": "azurerm_resource_group.main",
+                 "change": {"actions": ["create"]}},
+                {"address": "azurerm_container_registry.main",
+                 "change": {"actions": ["create"]}},
+            ]
+        }))
+        return 0
+
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
