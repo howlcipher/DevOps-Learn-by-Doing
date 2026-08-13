@@ -6,7 +6,6 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
-import shutil
 from typing import Any, Mapping
 import urllib.error
 import urllib.request
@@ -30,6 +29,7 @@ from devops_learn.tools import _subprocess_safety
 from devops_learn.tools.terraform_tool import terraform_config_digest
 from devops_learn.validation import terraform_plan_analysis
 from devops_learn.workflows.security_flow import SecurityOptions, run_security_scan
+from devops_learn.workflows.doctor_flow import collect_doctor_report, render_doctor_report
 from devops_learn.workflows.ui import Ui
 
 
@@ -300,13 +300,10 @@ def run_deploy_flow(platform: Platform, ui: Ui, options: DeployOptions) -> None:
 
 
 def _preflight(platform: Platform, ui: Ui, options: DeployOptions) -> bool:
-    unavailable = [
-        name
-        for name in ("terraform", "docker", "trivy", "conftest", "az")
-        if not shutil.which(name)
-    ]
-    if unavailable:
-        ui.present("AZURE PREFLIGHT FAILED: install " + ", ".join(unavailable) + ".")
+    doctor = collect_doctor_report(platform)
+    if not doctor.azure_deployment_ready:
+        ui.present(render_doctor_report(doctor))
+        ui.present("AZURE PREFLIGHT FAILED: Azure deployment is not ready.")
         return False
     result = platform.tool_service.invoke(
         "azure", "preflight", {"region": options.location, "environment": options.environment}

@@ -37,6 +37,7 @@ separate from the policy gate that can still return `BLOCK`.
 Run a capability check before scanning:
 
 ```bash
+devops-learn doctor
 devops-learn security doctor
 ```
 

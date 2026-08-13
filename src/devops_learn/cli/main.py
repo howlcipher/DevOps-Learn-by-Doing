@@ -11,6 +11,7 @@ from devops_learn.cli.commands import (
     analyze,
     deploy,
     destroy,
+    doctor,
     explain,
     history,
     init,
@@ -26,6 +27,7 @@ from devops_learn.learning.persistence.connection import connect
 from devops_learn.tools.approval import ApprovalGate, CliApprovalGate, ThresholdApprovalGate
 from devops_learn.tools.base import RiskLevel, Tool
 from devops_learn.tools.docker_tool import RealDockerTool, SimulatedDockerTool
+from devops_learn.tools.doctor_tool import EnvironmentDoctorTool
 from devops_learn.tools.git_tool import SimulatedGitTool
 from devops_learn.tools.kubernetes_tool import SimulatedKubernetesTool
 from devops_learn.tools.python_tool import RealPythonTool, SimulatedPythonTool
@@ -48,6 +50,7 @@ _COMMAND_MODULES = (
     security,
     deploy,
     destroy,
+    doctor,
 )
 
 
@@ -96,6 +99,12 @@ def _approval_gate_for_args(args: argparse.Namespace) -> ApprovalGate:
 
 
 def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
+    if args.command == "doctor":
+        return {
+            "doctor": EnvironmentDoctorTool(),
+            "security_scanner": SecurityScannerTool(),
+            "security_policy": PolicyTool(),
+        }
     if args.command == "security":
         return {"security_scanner": SecurityScannerTool(), "security_policy": PolicyTool()}
     if args.command == "terraform":
@@ -112,6 +121,7 @@ def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
         }
     if args.command in {"deploy", "destroy"}:
         return {
+            "doctor": EnvironmentDoctorTool(),
             "python": RealPythonTool(),
             "git": SimulatedGitTool(),
             "docker": RealDockerTool(),
