@@ -7,7 +7,9 @@ from pathlib import Path
 
 
 def default_db_path() -> Path:
-    return Path.home() / ".devops_learn" / "learning.db"
+    import os
+    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+    return Path(data_home) / "devops-learn" / "learning.db"
 
 
 def connect(db_path: Path) -> sqlite3.Connection:

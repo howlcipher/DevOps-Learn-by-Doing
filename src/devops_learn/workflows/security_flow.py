@@ -173,13 +173,15 @@ def run_security_scan(
     ) as temporary:
         json.dump(policy_input(findings), temporary)
         policy_input_path = Path(temporary.name)
+    import importlib.resources
     try:
-        policy_dir = Path(__file__).resolve().parents[3] / "policy" / "security"
-        policy_result = platform.tool_service.invoke(
-            "security_policy",
-            "evaluate",
-            {"input_path": str(policy_input_path), "policy_path": str(policy_dir)},
-        )
+        policy_files = importlib.resources.files("devops_learn.policy").joinpath("security")
+        with importlib.resources.as_file(policy_files) as policy_dir:
+            policy_result = platform.tool_service.invoke(
+                "security_policy",
+                "evaluate",
+                {"input_path": str(policy_input_path), "policy_path": str(policy_dir)},
+            )
     finally:
         policy_input_path.unlink(missing_ok=True)
     if not policy_result.success:

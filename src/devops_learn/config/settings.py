@@ -13,6 +13,7 @@ from devops_learn.learning.persistence.connection import default_db_path
 class Settings:
     db_path: Path
     anthropic_api_key: str | None
+    ai_provider: str
 
 
 def load_settings() -> Settings:
@@ -21,4 +22,5 @@ def load_settings() -> Settings:
     return Settings(
         db_path=db_path,
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY"),
+        ai_provider=os.environ.get("DEVOPS_LEARN_AI_PROVIDER", "auto").lower(),
     )
