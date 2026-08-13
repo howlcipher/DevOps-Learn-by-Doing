@@ -74,9 +74,11 @@ _RESOURCE_BLOCK_PATTERN = re.compile(r'^\s*resource\s+"', re.MULTILINE)
 _FALLBACK_RESOURCE_COUNT = 3
 
 
-def _reference_config_path() -> Path:
-    # src/devops_learn/tools/terraform_tool.py -> repo root is 3 parents up.
-    return Path(__file__).resolve().parents[3] / "templates" / "terraform" / "main.tf.reference"
+def _reference_config_path() -> Any:
+    import importlib.resources
+    return importlib.resources.files("devops_learn.templates.terraform").joinpath(
+        "main.tf.reference"
+    )
 
 
 def _count_declared_resources() -> int:

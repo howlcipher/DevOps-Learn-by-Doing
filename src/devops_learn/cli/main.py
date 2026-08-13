@@ -17,14 +17,20 @@ from devops_learn.cli.commands import (
     init,
     local,
     profile,
+    report,
     review,
     security,
     terraform,
+    ai_test,
 )
 from devops_learn.config.settings import load_settings
 from devops_learn.domain.enums import ExecutionMode
 from devops_learn.learning.persistence.connection import connect
-from devops_learn.tools.approval import ApprovalGate, CliApprovalGate, ThresholdApprovalGate
+from devops_learn.tools.approval import (
+    ApprovalGate,
+    CliApprovalGate,
+    ThresholdApprovalGate,
+)
 from devops_learn.tools.base import RiskLevel, Tool
 from devops_learn.tools.docker_tool import RealDockerTool, SimulatedDockerTool
 from devops_learn.tools.doctor_tool import EnvironmentDoctorTool
@@ -51,6 +57,8 @@ _COMMAND_MODULES = (
     deploy,
     destroy,
     doctor,
+    report,
+    ai_test,
 )
 
 
@@ -68,18 +76,87 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> None:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+def _show_first_run_screen() -> None:
+    import os
+    import sys
+    from devops_learn.config.settings import load_settings
+    from devops_learn.bootstrap import build_platform
+    from devops_learn.learning.persistence.connection import connect
+    from devops_learn.workflows.doctor_flow import collect_doctor_report
+    from devops_learn.tools.doctor_tool import EnvironmentDoctorTool
+    from devops_learn.tools.security_scanner_tool import SecurityScannerTool
+    from devops_learn.tools.policy_tool import PolicyTool
+
+    def _c(text: str, code: str) -> str:
+        if (
+            not sys.stdout.isatty()
+            or os.environ.get("NO_COLOR")
+            or os.environ.get("TERM") == "dumb"
+        ):
+            return text
+        return f"\033[{code}m{text}\033[0m"
+
+    print(_c("DEVOPS LEARN", "1"))
+    print("\nAI-assisted DevOps mastery through real engineering.\n")
 
     settings = load_settings()
     conn = connect(settings.db_path)
     try:
-        llm_provider = (
-            AnthropicProvider(api_key=settings.anthropic_api_key)
-            if settings.anthropic_api_key
-            else None
+        platform = build_platform(
+            conn,
+            llm_provider=None,
+            approval_gate=CliApprovalGate(),
+            tools={
+                "doctor": EnvironmentDoctorTool(),
+                "security_scanner": SecurityScannerTool(),
+                "security_policy": PolicyTool(),
+            },
         )
+        report = collect_doctor_report(platform)
+
+        print(_c("READY", "1"))
+        print(
+            f"{'Local environment':<23} {'YES' if report.local_workflow_ready else 'NO'}"
+        )
+        print(
+            f"{'Security tooling':<23} {'YES' if report.security_workflow_ready else 'NO'}"
+        )
+        print(f"{'Terraform':<23} {'YES' if report.terraform_planning_ready else 'NO'}")
+        print(f"{'Azure':<23} {'YES' if report.azure_deployment_ready else 'NO'}")
+        profile = platform.learner_profile_service.load()
+        has_profile = bool(profile.proficiencies or profile.learning_focus)
+        print(f"{'Learner profile':<23} {'YES' if has_profile else 'NO'}")
+        print("\n" + _c("NEXT", "1"))
+
+        if not report.local_workflow_ready or not report.security_workflow_ready:
+            print("devops-learn doctor")
+        else:
+            print("devops-learn init <project>")
+    finally:
+        conn.close()
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    import sys
+
+    effective_argv = sys.argv[1:] if argv is None else argv
+    if not effective_argv:
+        _show_first_run_screen()
+        return
+
+    parser = build_parser()
+    args = parser.parse_args(effective_argv)
+
+    settings = load_settings()
+    conn = connect(settings.db_path)
+    try:
+        if settings.ai_provider == "anthropic" or (
+            settings.ai_provider == "auto" and settings.anthropic_api_key
+        ):
+            llm_provider = AnthropicProvider(api_key=settings.anthropic_api_key)
+        else:
+            llm_provider = None
+
         approval_gate = _approval_gate_for_args(args)
         tools = _tools_for_args(args)
         platform = build_platform(
@@ -99,14 +176,17 @@ def _approval_gate_for_args(args: argparse.Namespace) -> ApprovalGate:
 
 
 def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
-    if args.command == "doctor":
+    if args.command in {"doctor", "init"}:
         return {
             "doctor": EnvironmentDoctorTool(),
             "security_scanner": SecurityScannerTool(),
             "security_policy": PolicyTool(),
         }
     if args.command == "security":
-        return {"security_scanner": SecurityScannerTool(), "security_policy": PolicyTool()}
+        return {
+            "security_scanner": SecurityScannerTool(),
+            "security_policy": PolicyTool(),
+        }
     if args.command == "terraform":
         # This command only ever invokes the "terraform" tool -- keep the rest
         # simulated rather than provisioning real python/docker tools it never uses.

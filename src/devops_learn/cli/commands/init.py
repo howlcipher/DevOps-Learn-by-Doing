@@ -42,7 +42,7 @@ def run(args: argparse.Namespace, platform: Platform) -> None:
 
     profile = platform.learner_profile_service.load()
     if args.non_interactive:
-        _show_summary(ui, assessment, profile, EnvironmentKind.DEV, CostPriority.BALANCED)
+        _show_summary(platform, ui, assessment, profile, EnvironmentKind.DEV, CostPriority.BALANCED)
         return
 
     cloud = _ask_cloud(ui)
@@ -52,7 +52,7 @@ def run(args: argparse.Namespace, platform: Platform) -> None:
     profile = _update_profile(profile, focus, ui)
     platform.learner_profile_service.save(profile)
 
-    _show_summary(ui, assessment, profile, environment, cost_priority, cloud=cloud)
+    _show_summary(platform, ui, assessment, profile, environment, cost_priority, cloud=cloud)
 
 
 def _render_assessment(assessment: ProjectAssessment) -> str:
@@ -165,6 +165,7 @@ def _ask_proficiency(ui: TerminalUi, area: CompetencyArea) -> ProficiencyLevel:
 
 
 def _show_summary(
+    platform: Platform,
     ui: TerminalUi,
     assessment: ProjectAssessment,
     profile: LearnerProfile,
@@ -186,8 +187,19 @@ def _show_summary(
     else:
         lines.append("Learning focus: none set")
     lines.append("")
-    lines.append(
-        "Run 'devops-learn analyze <path> --mode collaborative --depth learning' "
-        "to start the workflow."
-    )
+
+    from devops_learn.workflows.doctor_flow import collect_doctor_report
+    report = collect_doctor_report(platform)
+
+    if not report.local_workflow_ready:
+        lines.append(
+            "Next Step: Local workflow not ready. "
+            "Run 'devops-learn doctor' to fix dependencies."
+        )
+    else:
+        lines.append(
+            f"Next Step: Run 'devops-learn analyze {assessment.root_path} "
+            "--mode collaborative --depth learning' to start the workflow."
+        )
+
     ui.present("\n".join(lines))

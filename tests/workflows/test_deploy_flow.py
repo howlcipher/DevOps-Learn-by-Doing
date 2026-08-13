@@ -135,7 +135,8 @@ def test_deploy_preflight_reuses_doctor_before_azure_authentication() -> None:
             return type("Result", (), {"success": False, "summary": "unavailable"})()
 
     tool_service = ToolService()
-    platform = type("Platform", (), {"tool_service": tool_service})()
+    mock_llm = type("MockLLM", (), {})()
+    platform = type("Platform", (), {"tool_service": tool_service, "llm": mock_llm})()
     ui = ScriptedUi([])
 
     assert not _preflight(

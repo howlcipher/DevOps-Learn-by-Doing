@@ -16,6 +16,9 @@ def test_doctor_report_exposes_capability_specific_readiness() -> None:
         security_workflow_ready=True,
         terraform_planning_ready=False,
         azure_deployment_ready=False,
+        ai_provider="Mock",
+        ai_mode="OFFLINE",
+        db_writable=True,
     )
 
     rendered = render_doctor_report(report)

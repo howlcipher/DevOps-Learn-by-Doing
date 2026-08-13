@@ -23,6 +23,9 @@ class DoctorReport:
     security_workflow_ready: bool
     terraform_planning_ready: bool
     azure_deployment_ready: bool
+    ai_provider: str
+    ai_mode: str
+    db_writable: bool
 
 
 _CHECKS = (
@@ -43,6 +46,25 @@ def _available(details: Mapping[str, Any], name: str) -> bool:
 
 
 def collect_doctor_report(platform: Platform) -> DoctorReport:
+    import os
+    from devops_learn.config.settings import load_settings
+    settings = load_settings()
+    db_writable = False
+    try:
+        db_path = settings.db_path
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        if not db_path.exists():
+            db_path.touch()
+        db_writable = os.access(db_path, os.W_OK)
+    except Exception:
+        pass
+
+    ai_provider = "Mock"
+    ai_mode = "OFFLINE / DETERMINISTIC"
+    if platform.llm.__class__.__name__ == "AnthropicProvider":
+        ai_provider = "Anthropic"
+        ai_mode = "LIVE EXPLANATION"
+
     environment = platform.tool_service.invoke("doctor", "check", {}).details.get("checks", {})
     if not isinstance(environment, Mapping):
         environment = {}
@@ -72,6 +94,9 @@ def collect_doctor_report(platform: Platform) -> DoctorReport:
         security_workflow_ready=ready["git"] and ready["trivy"] and ready["conftest"],
         terraform_planning_ready=ready["terraform"] and ready["azure_cli"] and ready["azure_auth"],
         azure_deployment_ready=all(ready.values()),
+        ai_provider=ai_provider,
+        ai_mode=ai_mode,
+        db_writable=db_writable,
     )
 
 
@@ -89,6 +114,13 @@ def render_doctor_report(report: DoctorReport) -> str:
             f"Security workflow:  {'YES' if report.security_workflow_ready else 'NO'}",
             f"Terraform planning: {'YES' if report.terraform_planning_ready else 'NO'}",
             f"Azure deployment:   {'YES' if report.azure_deployment_ready else 'NO'}",
+            "",
+            "STORAGE",
+            f"Database writable:  {'YES' if report.db_writable else 'NO'}",
+            "",
+            "AI",
+            f"Provider:           {report.ai_provider}",
+            f"Mode:               {report.ai_mode}",
         )
     )
     actions: list[str] = []
