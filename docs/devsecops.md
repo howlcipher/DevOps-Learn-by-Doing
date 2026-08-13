@@ -144,6 +144,6 @@ not marked live-verified until an opt-in Azure run succeeds.
 
 Image scanning requires a locally built image and Docker availability. The
 first comparison implementation does not solve every move, rename, or package
-upgrade equivalence. Policy overrides, real Terraform plan scanning, Azure
-apply, runtime detection, and Kubernetes deployment are intentionally out of
-scope.
+upgrade equivalence. Policy overrides, full Terraform-plan content scanning,
+runtime vulnerability detection, and Kubernetes deployment are intentionally
+out of scope.

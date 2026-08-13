@@ -120,12 +120,36 @@ class AzureCliTool(Tool):
                 ]
                 ok, payload, error = _json(command)
                 safe = _container_app_view(payload)
+                logs = _subprocess_safety.run_safely(
+                    [
+                        az,
+                        "containerapp",
+                        "logs",
+                        "show",
+                        "--name",
+                        app,
+                        "--resource-group",
+                        resource_group,
+                        "--tail",
+                        "50",
+                    ],
+                    cwd=None,
+                    timeout=45,
+                )
                 return ToolResult(
                     ok,
                     "(real) collected Container App evidence"
                     if ok
                     else "(real, failed) could not collect Container App evidence",
-                    safe if ok else {"error": error},
+                    (
+                        {
+                            **safe,
+                            "logs": logs.stdout if logs.returncode == 0 else logs.stderr,
+                            "logs_collected": logs.returncode == 0,
+                        }
+                        if ok
+                        else {"error": error}
+                    ),
                     spec.risk_level,
                     False,
                     approval,
@@ -235,17 +259,23 @@ class AzureCliTool(Tool):
                 _container_app_view(payload) if name == "container_app" else _resource_view(payload)
             )
         expected_region = str(params.get("expected_region", "")).lower()
-        actual_region = str(observed["resource_group"].get("location", "")).lower()
         expected_tags = params.get("expected_tags", {})
-        actual_tags = observed["resource_group"].get("tags", {})
-        valid = (not expected_region or expected_region == actual_region) and all(
-            actual_tags.get(k) == v for k, v in expected_tags.items()
+        expected_image = str(params.get("expected_image", ""))
+        resources_match = all(
+            (not expected_region or str(resource.get("location", "")).lower() == expected_region)
+            and all(resource.get("tags", {}).get(k) == v for k, v in expected_tags.items())
+            for resource in observed.values()
         )
+        image_matches = (
+            not expected_image
+            or observed["container_app"].get("image") == expected_image
+        )
+        valid = resources_match and image_matches
         return ToolResult(
             valid,
             "(real) DECLARED BY TERRAFORM matches OBSERVED IN AZURE"
             if valid
-            else "(real, failed) Azure observation does not match declared region or tags",
+            else "(real, failed) Azure observation does not match declared region, tags, or image",
             observed,
             spec.risk_level,
             False,
@@ -267,12 +297,14 @@ def _container_app_view(payload: dict[str, Any]) -> dict[str, Any]:
     template = properties.get("template", {})
     containers = template.get("containers", [])
     ingress = properties.get("configuration", {}).get("ingress", {})
+    fqdn = ingress.get("fqdn")
+    endpoint = f"https://{fqdn}" if fqdn and not str(fqdn).startswith("http") else fqdn
     return {
         "name": payload.get("name"),
         "location": payload.get("location"),
         "tags": payload.get("tags", {}),
         "image": containers[0].get("image") if containers else None,
-        "endpoint": ingress.get("fqdn"),
+        "endpoint": endpoint,
         "revision": properties.get("latestRevisionName"),
         "running_status": properties.get("runningStatus"),
     }

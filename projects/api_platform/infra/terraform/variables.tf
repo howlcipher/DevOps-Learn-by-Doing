@@ -10,6 +10,17 @@ variable "location" {
   default     = "eastus"
 }
 
+variable "environment" {
+  description = "Learning environment label included in every resource name and tag."
+  type        = string
+  default     = "learning"
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]{2,20}$", var.environment))
+    error_message = "environment must be 2-20 lowercase letters, numbers, or hyphens."
+  }
+}
+
 variable "deploy_application" {
   description = "Set after the ACR image has been pushed. Bootstrap stays image-independent."
   type        = bool

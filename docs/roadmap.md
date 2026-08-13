@@ -35,10 +35,10 @@ structured parsing of `terraform show -json` feeding the existing
 `validation/terraform_plan_analysis.analyze()` risk classifier unchanged.
 `devops-learn terraform` runs the full vertical slice (fmt -> init ->
 validate -> plan -> risk analysis) and teaches Terraform state, provider,
-and resource-address concepts just-in-time (`docs/terraform-state.md`). No
-`apply`; `apply_approved_plan`/`destroy_approved_environment` are not even
-declared on `RealTerraformTool` and stay simulated until Milestone 3. `plan`
-requires Azure authentication and fails cleanly, with an explanation, on a
+and resource-address concepts just-in-time (`docs/terraform-state.md`). This
+standalone command has no apply action; the separately approved lifecycle
+commands introduced in Milestone 3 own real apply and destroy. `plan` requires
+Azure authentication and fails cleanly, with an explanation, on a
 machine without it — `init`/`validate`/`fmt` need no credentials.
 
 ## Milestone 3: first Azure vertical slice (implemented, awaiting live verification)
@@ -64,8 +64,8 @@ Conftest policy. The deterministic gate includes structural secret redaction,
 audit/experience evidence, remediation classification, a report artifact, demo,
 and PR CI. See `docs/devsecops.md`.
 
-The next dependency is the real Terraform plan plus Azure deployment path,
-where this gate must be required before any real apply.
+The gate is now bound to each deployment candidate before any real apply. Live
+Azure verification remains the final opt-in acceptance step.
 
 ## Further out (not yet milestoned)
 

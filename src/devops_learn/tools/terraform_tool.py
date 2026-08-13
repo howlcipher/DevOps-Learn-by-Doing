@@ -244,9 +244,12 @@ def _variable_args(params: Mapping[str, Any]) -> list[str]:
     variables = params.get("variables", {})
     if not isinstance(variables, Mapping):
         raise ValueError("Terraform variables must be a mapping.")
-    allowed = {"deploy_application", "app_image"}
+    allowed = {"deploy_application", "app_image", "location", "environment"}
     if set(variables) - allowed:
-        raise ValueError("Only deploy_application and app_image are accepted by this workflow.")
+        raise ValueError(
+            "Only deploy_application, app_image, location, and environment are accepted "
+            "by this workflow."
+        )
     args: list[str] = []
     for name in sorted(variables):
         value = variables[name]
@@ -254,6 +257,10 @@ def _variable_args(params: Mapping[str, Any]) -> list[str]:
             raise ValueError("deploy_application must be boolean.")
         if name == "app_image" and (not isinstance(value, str) or "@sha256:" not in value):
             raise ValueError("app_image must be a digest-pinned image reference.")
+        if name == "location" and (not isinstance(value, str) or not value.strip()):
+            raise ValueError("location must be a non-empty Azure region name.")
+        if name == "environment" and (not isinstance(value, str) or not value.strip()):
+            raise ValueError("environment must be a non-empty deployment environment name.")
         args.extend(["-var", f"{name}={str(value).lower() if isinstance(value, bool) else value}"])
     return args
 
@@ -548,6 +555,16 @@ class RealTerraformTool(Tool):
                 "config_digest": terraform_config_digest(working_dir),
                 "plan_digest": _digest_file(plan_path),
             }
+            candidate_identity = params.get("candidate_identity")
+            if not isinstance(candidate_identity, str) or not candidate_identity:
+                return ToolResult(
+                    False,
+                    "(real, refused) apply requires the approved deployment candidate identity",
+                    {"reason": "candidate identity was not supplied"},
+                    spec.risk_level,
+                    False,
+                    approval,
+                )
             if any(not value or metadata.get(key) != value for key, value in expected.items()):
                 return ToolResult(
                     False,
@@ -572,6 +589,7 @@ class RealTerraformTool(Tool):
                     "stdout": result.stdout,
                     "stderr": result.stderr,
                     "plan_digest": expected["plan_digest"],
+                    "candidate_identity": candidate_identity,
                 },
                 spec.risk_level,
                 False,

@@ -27,7 +27,8 @@ Project -> Analysis -> Requirements -> Questions -> Recommendations -> Architect
 - **Real Terraform execution** (`devops-learn terraform`) runs actual
   `terraform fmt`/`init`/`validate`/`plan` against a real, committed Azure
   configuration, with structured `terraform show -json` parsing feeding a
-  deterministic risk classifier. No `apply`/`destroy` yet; `plan` requires
+  deterministic risk classifier. This standalone command has no `apply`/`destroy`;
+  `plan` requires
   Azure authentication and fails cleanly, with an explanation, without it.
 - **Simulated cloud/Kubernetes** execution for safe learning without
   credentials or cost (`devops-learn analyze` without `--real-tools`;

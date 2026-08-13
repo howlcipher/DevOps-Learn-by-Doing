@@ -49,6 +49,7 @@ def run_deploy_flow(platform: Platform, ui: Ui, options: DeployOptions) -> None:
     infra = project / "infra" / "terraform"
     report_path = project / "artifacts" / "deployment" / "azure-deployment-evidence.json"
     stages: dict[str, str] = {}
+    observed: dict[str, Any] | None = None
     if options.cloud != "azure" or not infra.is_dir():
         ui.present(
             "This real lifecycle currently supports the bundled Azure Terraform project only."
@@ -105,7 +106,9 @@ def run_deploy_flow(platform: Platform, ui: Ui, options: DeployOptions) -> None:
 
         source = _source_identity(project)
         config_digest = terraform_config_digest(infra)
-        bootstrap_security = _security(platform, ui, project, options, local_tag, "bootstrap")
+        bootstrap_security = _security(
+            platform, ui, project, options, local_tag, "bootstrap", session_id
+        )
         if bootstrap_security is None:
             stages["bootstrap_security"] = "REAL FAIL"
             return
@@ -122,13 +125,22 @@ def run_deploy_flow(platform: Platform, ui: Ui, options: DeployOptions) -> None:
             created_at=datetime.now(timezone.utc),
         )
         bootstrap_candidate = _plan_and_gate(
-            platform, ui, infra, bootstrap, {"deploy_application": False}
+            platform,
+            ui,
+            infra,
+            bootstrap,
+            {
+                "deploy_application": False,
+                "environment": options.environment,
+                "location": options.location,
+            },
+            session_id,
         )
         if bootstrap_candidate is None:
             stages["bootstrap_plan_or_eligibility"] = "REAL FAIL OR NOT APPROVED"
             return
         stages["bootstrap_plan_or_eligibility"] = "REAL APPROVED"
-        if not _apply(platform, infra, bootstrap_candidate):
+        if not _apply(platform, project, infra, bootstrap_candidate, session_id):
             stages["bootstrap_apply"] = "REAL FAIL OR APPROVAL DENIED"
             return
         stages["bootstrap_apply"] = "REAL PASS"
@@ -174,7 +186,7 @@ def run_deploy_flow(platform: Platform, ui: Ui, options: DeployOptions) -> None:
         stages["image_digest"] = "REAL PASS"
 
         application_security = _security(
-            platform, ui, project, options, image_digest_ref, "application"
+            platform, ui, project, options, image_digest_ref, "application", session_id
         )
         if application_security is None:
             stages["application_security"] = "REAL FAIL"
@@ -198,16 +210,32 @@ def run_deploy_flow(platform: Platform, ui: Ui, options: DeployOptions) -> None:
             ui,
             infra,
             application,
-            {"deploy_application": True, "app_image": image_digest_ref},
+            {
+                "deploy_application": True,
+                "app_image": image_digest_ref,
+                "environment": options.environment,
+                "location": options.location,
+            },
+            session_id,
         )
         if application_candidate is None:
             stages["application_plan_or_eligibility"] = "REAL FAIL OR NOT APPROVED"
             return
-        if not _apply(platform, infra, application_candidate):
+        stages["application_plan_or_eligibility"] = "REAL APPROVED"
+        if not _apply(platform, project, infra, application_candidate, session_id):
             stages["application_apply"] = "REAL FAIL OR APPROVAL DENIED"
             return
         stages["application_apply"] = "REAL PASS"
-        observed = _verify_azure(platform, outputs.details, options)
+        application_outputs = platform.tool_service.invoke(
+            "terraform", "output", {"path": str(infra)}
+        )
+        if not application_outputs.success:
+            stages["application_outputs"] = "REAL FAIL"
+            return
+        stages["application_outputs"] = "REAL PASS"
+        observed = _verify_azure(
+            platform, application_outputs.details, options, image_digest_ref
+        )
         if observed is None:
             stages["azure_verification"] = "REAL FAIL"
             return
@@ -219,9 +247,16 @@ def run_deploy_flow(platform: Platform, ui: Ui, options: DeployOptions) -> None:
                 "azure",
                 "container_app_evidence",
                 {
-                    "resource_group": outputs.details["resource_group_name"],
-                    "container_app_name": outputs.details["container_app_name"],
+                    "resource_group": application_outputs.details["resource_group_name"],
+                    "container_app_name": application_outputs.details["container_app_name"],
                 },
+            )
+            _audit(
+                platform,
+                session_id,
+                AuditEventType.TROUBLESHOOTING_STARTED,
+                "Health verification failed; collected Container App revision and log evidence",
+                {"candidate_identity": application_candidate.identity},
             )
             return
         stages["health_verification"] = "REAL PASS"
@@ -255,9 +290,13 @@ def run_deploy_flow(platform: Platform, ui: Ui, options: DeployOptions) -> None:
                 if stages.get("health_verification") == "REAL PASS"
                 else "stopped",
                 stages=stages,
+                observed_azure=observed,
             )
         platform.session_service.complete(session)
-        ui.present(f"Sanitized lifecycle evidence: {report_path}")
+        if report_path.is_file():
+            ui.present(f"Sanitized lifecycle evidence: {report_path}")
+        else:
+            ui.present("No deployment candidate was created; no lifecycle evidence was written.")
 
 
 def _preflight(platform: Platform, ui: Ui, options: DeployOptions) -> bool:
@@ -295,7 +334,13 @@ def _validation(platform: Platform, project: Path) -> bool:
 
 
 def _security(
-    platform: Platform, ui: Ui, project: Path, options: DeployOptions, image: str, stage: str
+    platform: Platform,
+    ui: Ui,
+    project: Path,
+    options: DeployOptions,
+    image: str,
+    stage: str,
+    session_id: int,
 ) -> tuple[Path, SecurityGateDecision] | None:
     path = project / "artifacts" / "deployment" / f"security-{stage}.json"
     report = run_security_scan(
@@ -303,6 +348,17 @@ def _security(
     )
     if report is None:
         return None
+    _audit(
+        platform,
+        session_id,
+        AuditEventType.SECURITY_GATE_EVALUATED,
+        f"{stage.title()} security evidence bound to deployment candidate",
+        {
+            "report_digest": sha256_file(path),
+            "decision": report.policy.decision.value,
+            "image": image,
+        },
+    )
     return path, report.policy.decision
 
 
@@ -312,6 +368,7 @@ def _plan_and_gate(
     infra: Path,
     candidate: DeploymentCandidate,
     variables: dict[str, object],
+    session_id: int,
 ) -> DeploymentCandidate | None:
     if not platform.tool_service.invoke("terraform", "fmt", {"path": str(infra)}).success:
         return None
@@ -345,6 +402,16 @@ def _plan_and_gate(
     if candidate.security_decision == SecurityGateDecision.REQUIRE_APPROVAL.value:
         prompt = f"Security approval for candidate {completed.identity[:12]} required. Approve?"
         security_approval = ui.confirm(prompt, default=False)
+        if not security_approval:
+            eligibility = evaluate_deployment_eligibility(
+                validation_passed=True,
+                gate=SecurityGateDecision.REQUIRE_APPROVAL,
+                approval_granted=False,
+            )
+            ui.present(
+                f"DEPLOYMENT ELIGIBILITY: {eligibility.eligibility.value} ({eligibility.reason})"
+            )
+            return None
     risk_prompt = (
         f"Terraform plan risk is {risk.name}. "
         f"Approve this exact candidate {completed.identity[:12]}?"
@@ -352,18 +419,42 @@ def _plan_and_gate(
     risk_approval = risk.name not in {"HIGH", "DESTRUCTIVE"} or ui.confirm(
         risk_prompt, default=False
     )
+    if not risk_approval:
+        ui.present("DEPLOYMENT ELIGIBILITY: ineligible (Terraform plan risk was not approved.)")
+        return None
+    cloud_action_approval = ui.confirm(
+        "Cloud action approval: apply this exact candidate "
+        f"{completed.identity[:12]} to Azure?",
+        default=False,
+    )
     eligibility = evaluate_deployment_eligibility(
         validation_passed=True,
         gate=SecurityGateDecision(candidate.security_decision or "block"),
-        approval_granted=security_approval and risk_approval,
+        approval_granted=security_approval and risk_approval and cloud_action_approval,
     )
-    ui.present(f"DEPLOYMENT ELIGIBILITY: {eligibility.eligibility.value} ({eligibility.reason})")
+    ui.present(
+        f"DEPLOYMENT ELIGIBILITY: {eligibility.eligibility.value} ({eligibility.reason})"
+    )
     if eligibility.eligibility is DeploymentEligibility.ELIGIBLE:
         approvals: list[str] = []
         if candidate.security_decision == SecurityGateDecision.REQUIRE_APPROVAL.value:
             approvals.append("security")
         if risk.name in {"HIGH", "DESTRUCTIVE"}:
             approvals.append("terraform_plan_risk")
+        approvals.append("cloud_action")
+        _audit(
+            platform,
+            session_id,
+            AuditEventType.USER_APPROVED_PLAN,
+            "Human approved exact deployment candidate",
+            {
+                "candidate_identity": completed.identity,
+                "plan_digest": completed.terraform_plan_digest,
+                "security_report_digest": completed.security_report_digest,
+                "image_digest": completed.image_digest,
+                "approvals": approvals,
+            },
+        )
         return replace(
             completed,
             deployment_eligibility=eligibility.eligibility.value,
@@ -372,10 +463,25 @@ def _plan_and_gate(
     return None
 
 
-def _apply(platform: Platform, infra: Path, candidate: DeploymentCandidate) -> bool:
-    if not candidate.is_current() or candidate.terraform_config_digest != terraform_config_digest(
-        infra
+def _apply(
+    platform: Platform,
+    project: Path,
+    infra: Path,
+    candidate: DeploymentCandidate,
+    session_id: int,
+) -> bool:
+    if (
+        not candidate.is_current()
+        or candidate.terraform_config_digest != terraform_config_digest(infra)
+        or candidate.source_revision != _source_identity(project)
     ):
+        _audit(
+            platform,
+            session_id,
+            AuditEventType.DEPLOYMENT_FAILED,
+            "Deployment candidate became stale before apply",
+            {"candidate_identity": candidate.identity},
+        )
         return False
     result = platform.tool_service.invoke(
         "terraform",
@@ -388,11 +494,30 @@ def _apply(platform: Platform, infra: Path, candidate: DeploymentCandidate) -> b
             "source_revision": candidate.source_revision,
         },
     )
+    _audit(
+        platform,
+        session_id,
+        AuditEventType.TOOL_INVOKED,
+        (
+            "Approved Terraform apply completed"
+            if result.success
+            else "Approved Terraform apply failed"
+        ),
+        {
+            "candidate_identity": candidate.identity,
+            "plan_digest": candidate.terraform_plan_digest,
+            "returncode": result.details.get("returncode"),
+            "approved_by": result.approval.approved_by if result.approval else None,
+        },
+    )
     return result.success
 
 
 def _verify_azure(
-    platform: Platform, outputs: Mapping[str, Any], options: DeployOptions
+    platform: Platform,
+    outputs: Mapping[str, Any],
+    options: DeployOptions,
+    expected_image: str,
 ) -> dict[str, Any] | None:
     result = platform.tool_service.invoke(
         "azure",
@@ -404,6 +529,7 @@ def _verify_azure(
             "container_app_name": outputs["container_app_name"],
             "expected_region": options.location,
             "expected_tags": {"environment": options.environment, "managed-by": "terraform"},
+            "expected_image": expected_image,
         },
     )
     return dict(result.details) if result.success else None
@@ -440,12 +566,19 @@ def _source_identity(project: Path) -> str:
     return f"{git_sha}:workspace-{digest.hexdigest()}"
 
 
-def _audit(platform: Platform, session_id: int, event_type: AuditEventType, summary: str) -> None:
+def _audit(
+    platform: Platform,
+    session_id: int,
+    event_type: AuditEventType,
+    summary: str,
+    payload: Mapping[str, Any] | None = None,
+) -> None:
     platform.audit_service.record(
         session_id=session_id,
         event_type=event_type,
         occurred_at=datetime.now(timezone.utc),
         summary=summary,
+        payload=payload,
     )
 
 
@@ -455,7 +588,13 @@ def run_cleanup_flow(platform: Platform, ui: Ui, options: DeployOptions) -> bool
     infra = project / "infra" / "terraform"
     if not infra.is_dir() or not _preflight(platform, ui, options):
         return False
-    resource_group = "api-platform-rg"
+    outputs = platform.tool_service.invoke("terraform", "output", {"path": str(infra)})
+    resource_group = str(outputs.details.get("resource_group_name", ""))
+    if not outputs.success or not resource_group:
+        ui.present(
+            "DESTROY REFUSED: Terraform state does not identify a deployed learning resource group."
+        )
+        return False
     ui.present(
         "DESTROY TARGET\n\n"
         f"Resource group: {resource_group}\nEnvironment: {options.environment}\n"

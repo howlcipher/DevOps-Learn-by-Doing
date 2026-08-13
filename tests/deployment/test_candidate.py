@@ -1,4 +1,5 @@
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -37,3 +38,22 @@ def test_candidate_requires_evidence_paths_for_digests() -> None:
         replace(_candidate(), terraform_plan_digest="plan")
     with pytest.raises(ValueError, match="report path"):
         replace(_candidate(), security_report_path=None)
+
+
+def test_candidate_detects_changed_saved_evidence(tmp_path: Path) -> None:
+    report = tmp_path / "security.json"
+    plan = tmp_path / "approved.tfplan"
+    report.write_text('{"decision":"allow"}\n')
+    plan.write_bytes(b"approved-plan")
+    from devops_learn.deployment.candidate import sha256_file
+
+    candidate = replace(
+        _candidate(),
+        security_report_path=str(report),
+        security_report_digest=sha256_file(report),
+        terraform_plan_path=str(plan),
+        terraform_plan_digest=sha256_file(plan),
+    )
+    assert candidate.is_current()
+    plan.write_bytes(b"changed-plan")
+    assert not candidate.is_current()

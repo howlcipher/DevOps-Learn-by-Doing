@@ -74,20 +74,22 @@ resources, applies Terraform, or modifies remote state. It:
 
 ## Real Terraform execution
 
-`devops-learn terraform` is the only command that uses `RealTerraformTool`
-(`tools/terraform_tool.py`) — `devops-learn analyze --real-tools` and `devops-learn local` both
-still use `SimulatedTerraformTool` for the `terraform` tool name; only `python`/`docker` become
-real for those commands. `RealTerraformTool` declares only `fmt`/`init`/`validate`/`plan` —
-`apply_approved_plan` and `destroy_approved_environment` are real-only Tool
-operations. Apply accepts only a saved plan in `.devops_learn/plans` and
+`devops-learn terraform`, `devops-learn deploy`, and `devops-learn destroy`
+use `RealTerraformTool` (`tools/terraform_tool.py`). `devops-learn analyze
+--real-tools` and `devops-learn local` still use `SimulatedTerraformTool` for
+the `terraform` tool name. The standalone `terraform` command exposes only
+`fmt`/`init`/`validate`/`plan`; `apply_approved_plan` and
+`destroy_approved_environment` are real-only operations reached through the
+explicit lifecycle commands. Apply accepts only a saved plan in `.devops_learn/plans` and
 rechecks its digest, source identity, Terraform configuration digest, and
 candidate context before invoking Terraform. Destroy requires an explicit
 target environment and is followed by a read-only Azure resource-group check.
 Neither operation can fall back to simulation; normal CI does not call either.
 
-Every subprocess call goes through `tools/_subprocess_safety.py::run_safely`, which sets an
-explicit timeout and always redacts secret-shaped `KEY=value` text and truncates long output
-before it reaches a `ToolResult`. `plan()`'s parsing of `terraform show -json` never extracts
+Terraform, Docker, and Azure CLI subprocess calls go through
+`tools/_subprocess_safety.py::run_safely`, which sets an explicit timeout and
+always redacts secret-shaped `KEY=value` text and truncates long output before
+it reaches a `ToolResult`. `plan()`'s parsing of `terraform show -json` never extracts
 raw resource attribute values (`before`/`after`) — only `{address, action}` per resource change
 — which is the primary defense against leaking sensitive plan data; free-text redaction is
 defense in depth on top of that.
@@ -113,7 +115,9 @@ do support a dry run that skips approval when the operation is simulated.
 
 ## Cost awareness
 
-No cloud action in V1 can create a billable resource; `cloud.estimate_cost` deliberately never
-returns a specific dollar figure, since V1 has no real pricing data to draw from.
+The real-only Azure lifecycle can create billable learning resources only after
+explicit confirmations and tool-level approval. `cloud.estimate_cost` still
+deliberately never returns a specific dollar figure, since it has no live
+pricing data to draw from.
 Cost impact in a `Recommendation` (e.g. "lower likely cost than a managed cluster") is always
 qualitative for the same reason.
