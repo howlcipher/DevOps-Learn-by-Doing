@@ -2,8 +2,7 @@ import json
 import os
 from pathlib import Path
 
-import pytest
-
+from devops_learn.tools.approval import ApprovalRecord
 from devops_learn.tools.base import RiskLevel
 from devops_learn.tools.terraform_tool import RealTerraformTool
 from devops_learn.validation import terraform_plan_analysis
@@ -16,22 +15,31 @@ def _use_fake_terraform(monkeypatch, scenario: str = "success") -> None:
     monkeypatch.setenv("FAKE_TERRAFORM_SCENARIO", scenario)
 
 
-def test_real_terraform_tool_has_safe_operations() -> None:
+def test_real_terraform_tool_declares_real_apply_and_destroy_risk() -> None:
     tool = RealTerraformTool()
     assert tool.name == "terraform"
     names = {spec.name for spec in tool.operations}
-    assert names == {"fmt", "init", "validate", "plan"}
+    assert names == {
+        "fmt",
+        "init",
+        "validate",
+        "plan",
+        "output",
+        "apply_approved_plan",
+        "destroy_approved_environment",
+    }
     for spec in tool.operations:
+        if spec.name in {"apply_approved_plan", "destroy_approved_environment"}:
+            assert spec.requires_approval
+            continue
         assert spec.risk_level is RiskLevel.SAFE
         assert not spec.requires_approval
 
 
-def test_real_terraform_tool_does_not_expose_apply_or_destroy() -> None:
+def test_real_terraform_tool_apply_and_destroy_require_approval() -> None:
     tool = RealTerraformTool()
-    with pytest.raises(KeyError):
-        tool.spec_for("apply_approved_plan")
-    with pytest.raises(KeyError):
-        tool.spec_for("destroy_approved_environment")
+    assert tool.spec_for("apply_approved_plan").risk_level is RiskLevel.HIGH
+    assert tool.spec_for("destroy_approved_environment").risk_level is RiskLevel.DESTRUCTIVE
 
 
 def test_missing_binary_reports_failure(monkeypatch, tmp_path) -> None:
@@ -178,6 +186,69 @@ def test_invalid_working_directory_reports_failure(monkeypatch, tmp_path) -> Non
         approval=None,
     )
     assert not result.success
+
+
+def test_saved_plan_binds_digest_source_config_and_candidate(monkeypatch, tmp_path) -> None:
+    _use_fake_terraform(monkeypatch)
+    tool = RealTerraformTool()
+    planned = tool.execute(
+        "plan",
+        {"path": str(tmp_path), "source_revision": "source-a", "candidate_context": "candidate-a"},
+        dry_run=False,
+        approval=None,
+    )
+    assert planned.success
+    assert Path(str(planned.details["plan_path"])).is_file()
+    assert planned.details["plan_digest"]
+    approved = ApprovalRecord(granted=True, approved_by="test")
+    applied = tool.execute(
+        "apply_approved_plan",
+        {
+            "path": str(tmp_path),
+            "plan_path": planned.details["plan_path"],
+            "source_revision": "source-a",
+            "candidate_context": "candidate-a",
+        },
+        dry_run=False,
+        approval=approved,
+    )
+    assert applied.success
+
+
+def test_apply_refuses_changed_source_or_plan(monkeypatch, tmp_path) -> None:
+    _use_fake_terraform(monkeypatch)
+    tool = RealTerraformTool()
+    planned = tool.execute(
+        "plan",
+        {"path": str(tmp_path), "source_revision": "source-a", "candidate_context": "candidate-a"},
+        dry_run=False,
+        approval=None,
+    )
+    changed_source = tool.execute(
+        "apply_approved_plan",
+        {
+            "path": str(tmp_path),
+            "plan_path": planned.details["plan_path"],
+            "source_revision": "source-b",
+            "candidate_context": "candidate-a",
+        },
+        dry_run=False,
+        approval=ApprovalRecord(granted=True, approved_by="test"),
+    )
+    assert not changed_source.success
+    Path(str(planned.details["plan_path"])).write_bytes(b"changed")
+    changed_plan = tool.execute(
+        "apply_approved_plan",
+        {
+            "path": str(tmp_path),
+            "plan_path": planned.details["plan_path"],
+            "source_revision": "source-a",
+            "candidate_context": "candidate-a",
+        },
+        dry_run=False,
+        approval=ApprovalRecord(granted=True, approved_by="test"),
+    )
+    assert not changed_plan.success
 
 
 def test_dry_run_never_invokes_subprocess(monkeypatch, tmp_path) -> None:

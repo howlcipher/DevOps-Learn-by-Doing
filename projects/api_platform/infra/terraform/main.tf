@@ -32,6 +32,19 @@ resource "azurerm_container_registry" "main" {
   tags                = local.tags
 }
 
+resource "azurerm_user_assigned_identity" "container_app" {
+  name                = "${var.project_name}-app-identity"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  tags                = local.tags
+}
+
+resource "azurerm_role_assignment" "container_app_acr_pull" {
+  scope                = azurerm_container_registry.main.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_user_assigned_identity.container_app.principal_id
+}
+
 resource "azurerm_log_analytics_workspace" "main" {
   name                = "${var.project_name}-logs"
   resource_group_name = azurerm_resource_group.main.name
@@ -39,4 +52,56 @@ resource "azurerm_log_analytics_workspace" "main" {
   sku                 = "PerGB2018"
   retention_in_days   = 30
   tags                = local.tags
+}
+
+resource "azurerm_container_app_environment" "main" {
+  name                       = "${var.project_name}-env"
+  resource_group_name        = azurerm_resource_group.main.name
+  location                   = azurerm_resource_group.main.location
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+  tags                       = local.tags
+}
+
+resource "azurerm_container_app" "api" {
+  count                        = var.deploy_application ? 1 : 0
+  name                         = "${var.project_name}-api"
+  resource_group_name          = azurerm_resource_group.main.name
+  container_app_environment_id = azurerm_container_app_environment.main.id
+  revision_mode                = "Single"
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.container_app.id]
+  }
+
+  registry {
+    server   = azurerm_container_registry.main.login_server
+    identity = azurerm_user_assigned_identity.container_app.id
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 8000
+
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }
+
+  template {
+    min_replicas = 0
+    max_replicas = 1
+
+    container {
+      name   = "api"
+      image  = var.app_image
+      cpu    = 0.25
+      memory = "0.5Gi"
+    }
+  }
+
+  tags = local.tags
+
+  depends_on = [azurerm_role_assignment.container_app_acr_pull]
 }

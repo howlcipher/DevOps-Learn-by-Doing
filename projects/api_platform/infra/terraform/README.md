@@ -22,8 +22,11 @@ requires Azure authentication (`az login`, or `ARM_CLIENT_ID` /
 variables) to build the provider client -- without it, `plan` fails cleanly
 and the workflow explains why rather than faking a result.
 
-`apply`/`destroy` are not implemented against this directory yet; see
-`docs/roadmap.md` (Milestone 3) and `docs/terraform-state.md`.
+`devops-learn deploy` persists an approved plan before real apply; it never
+accepts an arbitrary `terraform apply` command. `devops-learn destroy` is
+separately destructive, requires explicit confirmation and tool approval, and
+checks Azure after Terraform returns. These real-only operations are excluded
+from CI and have not been exercised from this checkout without Azure credentials.
 
 ## Local state
 

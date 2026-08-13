@@ -41,15 +41,20 @@ declared on `RealTerraformTool` and stay simulated until Milestone 3. `plan`
 requires Azure authentication and fails cleanly, with an explanation, on a
 machine without it — `init`/`validate`/`fmt` need no credentials.
 
-## Milestone 3: first Azure vertical slice
+## Milestone 3: first Azure vertical slice (implemented, awaiting live verification)
 
-A small, real path: Python application -> Docker -> ACR -> Terraform -> minimal
-Azure infrastructure -> deployment -> health verification, behind the existing
-approval gate confirming a real, non-simulated action. Provision a resource
-group and container registry first. Introduce AKS/Kubernetes only after this
-first real cloud execution path is reliable — not because Kubernetes is
-technically harder, but because a working real deployment path should exist
-before adding cluster-level complexity on top of it.
+The real-only `deploy` workflow uses a two-stage path: bootstrap Resource Group,
+ACR, Log Analytics, Container Apps Environment, managed identity and AcrPull;
+then push a digest-pinned FastAPI image and apply the Container App plan.
+It persists saved plans and candidate evidence, requires explicit confirmation
+and tool approval, checks Azure independently, verifies `/health`, and offers
+an approved `destroy` flow with an Azure cleanup check. Container Apps is the
+right first fit for a small HTTP workload: it is managed and has much less
+operational overhead than AKS. AKS remains deliberately out of scope.
+
+This feature is not yet labelled live-verified: the current execution host has
+no Azure CLI, Docker, Trivy, or Conftest, so a real Azure deployment and cleanup
+remain an opt-in acceptance test.
 
 ## DevSecOps security control plane (done)
 

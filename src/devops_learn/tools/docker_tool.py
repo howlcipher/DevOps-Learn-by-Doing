@@ -50,15 +50,15 @@ _OPERATIONS = (
         requires_approval=True,
         is_destructive=True,
     ),
+    ToolOperationSpec("inspect_digest", RiskLevel.SAFE, False, False, False),
+    ToolOperationSpec("push", RiskLevel.LOW, False, False, False),
 )
 
 
 def _docker_command() -> str:
     command = shutil.which("docker")
     if command is None:
-        raise FileNotFoundError(
-            "Docker CLI not found. Install Docker or use simulation mode."
-        )
+        raise FileNotFoundError("Docker CLI not found. Install Docker or use simulation mode.")
     return command
 
 
@@ -104,6 +104,14 @@ class SimulatedDockerTool(Tool):
             name = params.get("container", "sim-container-01")
             summary = f"Stopped container {name} (simulated)"
             details = {"container": name}
+        elif operation == "inspect_digest":
+            image = str(params.get("image", "api-platform:dev"))
+            summary = f"Image digest for {image} (simulated)"
+            details = {"image": image, "digest": "sha256:simulated"}
+        elif operation == "push":
+            image = str(params.get("image", "api-platform:dev"))
+            summary = f"Pushed {image} (simulated)"
+            details = {"image": image}
         else:  # remove_image
             image = params.get("image", "api-platform:dev")
             summary = f"Removed image {image} (simulated)"
@@ -157,9 +165,7 @@ class RealDockerTool(Tool):
                 context = params.get("context", ".")
                 tag = params.get("tag", "api-platform:dev")
                 file_arg = params.get("dockerfile", "Dockerfile")
-                completed = _run(
-                    [docker, "build", "-t", tag, "-f", file_arg, context]
-                )
+                completed = _run([docker, "build", "-t", tag, "-f", file_arg, context])
                 success = completed.returncode == 0
                 if completed.stdout:
                     summary = completed.stdout.strip().splitlines()[-1]
@@ -206,6 +212,36 @@ class RealDockerTool(Tool):
                     "returncode": completed.returncode,
                     "stderr": completed.stderr,
                 }
+            elif operation == "inspect_digest":
+                image = str(params.get("image", "api-platform:dev"))
+                completed = _run(
+                    [docker, "image", "inspect", "--format", "{{index .RepoDigests 0}}", image]
+                )
+                digest = completed.stdout.strip()
+                success = completed.returncode == 0 and "@sha256:" in digest
+                summary = (
+                    digest
+                    if success
+                    else "image digest unavailable; push the image to a registry first"
+                )
+                details = {
+                    "image": image,
+                    "digest": digest,
+                    "returncode": completed.returncode,
+                    "stderr": completed.stderr,
+                }
+            elif operation == "push":
+                image = str(params.get("image", ""))
+                if not image:
+                    raise ValueError("Docker push requires an explicit image reference.")
+                completed = _run([docker, "push", image])
+                success = completed.returncode == 0
+                summary = f"Pushed {image}" if success else f"Failed to push {image}"
+                details = {
+                    "image": image,
+                    "returncode": completed.returncode,
+                    "stderr": completed.stderr,
+                }
             else:  # remove_image
                 image = params.get("image", "api-platform:dev")
                 completed = _run([docker, "rmi", image])
@@ -216,7 +252,7 @@ class RealDockerTool(Tool):
                     "returncode": completed.returncode,
                     "stderr": completed.stderr,
                 }
-        except FileNotFoundError as exc:
+        except (FileNotFoundError, OSError, ValueError) as exc:
             return ToolResult(
                 success=False,
                 summary=str(exc),

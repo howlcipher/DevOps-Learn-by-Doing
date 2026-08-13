@@ -9,6 +9,8 @@ from devops_learn.ai.anthropic_provider import AnthropicProvider
 from devops_learn.bootstrap import build_platform
 from devops_learn.cli.commands import (
     analyze,
+    deploy,
+    destroy,
     explain,
     history,
     init,
@@ -32,8 +34,21 @@ from devops_learn.tools.validation_tool import SimulatedValidationTool
 from devops_learn.tools.cloud_tool import SimulatedCloudTool
 from devops_learn.tools.policy_tool import PolicyTool
 from devops_learn.tools.security_scanner_tool import SecurityScannerTool
+from devops_learn.tools.azure_tool import AzureCliTool
 
-_COMMAND_MODULES = (analyze, review, history, explain, profile, init, local, terraform, security)
+_COMMAND_MODULES = (
+    analyze,
+    review,
+    history,
+    explain,
+    profile,
+    init,
+    local,
+    terraform,
+    security,
+    deploy,
+    destroy,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -94,6 +109,19 @@ def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
             "kubernetes": SimulatedKubernetesTool(),
             "cloud": SimulatedCloudTool(),
             "validation": SimulatedValidationTool(),
+        }
+    if args.command in {"deploy", "destroy"}:
+        return {
+            "python": RealPythonTool(),
+            "git": SimulatedGitTool(),
+            "docker": RealDockerTool(),
+            "terraform": RealTerraformTool(),
+            "kubernetes": SimulatedKubernetesTool(),
+            "cloud": SimulatedCloudTool(),
+            "validation": SimulatedValidationTool(),
+            "security_scanner": SecurityScannerTool(),
+            "security_policy": PolicyTool(),
+            "azure": AzureCliTool(),
         }
     if getattr(args, "real_tools", False) or args.command == "local":
         return {

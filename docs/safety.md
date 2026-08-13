@@ -78,9 +78,12 @@ resources, applies Terraform, or modifies remote state. It:
 (`tools/terraform_tool.py`) — `devops-learn analyze --real-tools` and `devops-learn local` both
 still use `SimulatedTerraformTool` for the `terraform` tool name; only `python`/`docker` become
 real for those commands. `RealTerraformTool` declares only `fmt`/`init`/`validate`/`plan` —
-`apply_approved_plan`/`destroy_approved_environment` are not implemented on it at all, so
-invoking either raises `KeyError` rather than silently falling back to simulated behavior. Real
-apply/destroy stay simulated until Milestone 3 (`docs/roadmap.md`).
+`apply_approved_plan` and `destroy_approved_environment` are real-only Tool
+operations. Apply accepts only a saved plan in `.devops_learn/plans` and
+rechecks its digest, source identity, Terraform configuration digest, and
+candidate context before invoking Terraform. Destroy requires an explicit
+target environment and is followed by a read-only Azure resource-group check.
+Neither operation can fall back to simulation; normal CI does not call either.
 
 Every subprocess call goes through `tools/_subprocess_safety.py::run_safely`, which sets an
 explicit timeout and always redacts secret-shaped `KEY=value` text and truncates long output

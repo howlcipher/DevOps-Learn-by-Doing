@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "devops-learn"
-version = "0.1.0"
-description = "AI mentored, learn by doing DevOps and platform engineering CLI"
+version = "0.2.0"
+description = "AI-assisted DevOps learning CLI with a security-gated Azure deployment lifecycle"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
