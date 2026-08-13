@@ -682,19 +682,23 @@
             <span class="window-controls" aria-hidden="true"><span></span><span></span><span></span></span>
           </div>
           <div class="terminal">
-            <p><span class="dim"># install the project and development dependencies</span></p>
-            <p>pip install -e ".[dev]"</p>
+            <p><span class="dim"># 01 CHECK</span></p>
+            <p>devops-learn doctor</p>
             <br>
-            <p><span class="dim"># set your learner profile</span></p>
-            <p>devops-learn profile --set docker=strong terraform=beginner</p>
+            <p><span class="dim"># 02 UNDERSTAND</span></p>
+            <p>devops-learn init .</p>
             <br>
-            <p><span class="dim"># run a real local vertical slice</span></p>
-            <p>devops-learn local projects/api_platform</p>
+            <p><span class="dim"># 03 BUILD</span></p>
+            <p>devops-learn local .</p>
             <br>
-            <p><span class="dim"># simulate the full cloud workflow</span></p>
-            <p>devops-learn analyze projects/api_platform --mode collaborative --depth learning</p>
+            <p><span class="dim"># 04 SECURE</span></p>
+            <p>devops-learn security scan .</p>
             <br>
-            <p class="info">Other commands: init · review · history · explain</p>
+            <p><span class="dim"># 05 DEPLOY</span></p>
+            <p>devops-learn deploy .</p>
+            <br>
+            <p><span class="dim"># 06 PROVE</span></p>
+            <p>devops-learn report</p>
           </div>
         </div>
       </div>

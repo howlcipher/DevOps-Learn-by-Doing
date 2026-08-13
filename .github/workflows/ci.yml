@@ -92,6 +92,12 @@ jobs:
           test-venv/bin/pip install dist/*.whl
       - name: Smoke test CLI
         run: |
-          test-venv/bin/devops-learn doctor
-          test-venv/bin/devops-learn explain "Terraform state"
+          # Test outside the repository to ensure no accidental source dependencies
+          cd /tmp
+          $GITHUB_WORKSPACE/test-venv/bin/devops-learn
+          $GITHUB_WORKSPACE/test-venv/bin/devops-learn --help
+          $GITHUB_WORKSPACE/test-venv/bin/devops-learn doctor
+          $GITHUB_WORKSPACE/test-venv/bin/devops-learn report --help
+          $GITHUB_WORKSPACE/test-venv/bin/devops-learn ai-test --help
+          $GITHUB_WORKSPACE/test-venv/bin/devops-learn explain "Terraform state"
 

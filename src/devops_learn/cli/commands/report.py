@@ -32,7 +32,7 @@ def register(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") 
 def run(args: argparse.Namespace, platform: Platform) -> None:
     session = platform.session_service.latest()
     if not session:
-        print("No sessions found.")
+        print("No engagement evidence recorded yet.\n\nStart with:\ndevops-learn init <project>")
         return
     assert session.id is not None
 

@@ -22,6 +22,7 @@ from devops_learn.cli.commands import (
     security,
     terraform,
     ai_test,
+    config,
 )
 from devops_learn.config.settings import load_settings
 from devops_learn.domain.enums import ExecutionMode
@@ -59,6 +60,7 @@ _COMMAND_MODULES = (
     doctor,
     report,
     ai_test,
+    config,
 )
 
 
