@@ -61,6 +61,9 @@ pip install -e ".[dev]"
 ## Quick start
 
 ```
+# Check which real workflows this machine can run before installing or authenticating anything.
+devops-learn doctor
+
 # Set up a learner profile (optional but recommended)
 devops-learn profile --set docker=strong terraform=beginner azure=developing \
                      --focus terraform --focus azure
