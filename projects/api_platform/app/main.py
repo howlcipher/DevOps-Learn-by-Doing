@@ -21,13 +21,13 @@ app = FastAPI(title=settings.service_name, version=settings.service_version)
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     logger.info("health check requested")
     return {"status": "ok"}
 
 
 @app.get("/info")
-def info() -> dict[str, str]:
+async def info() -> dict[str, str]:
     return {
         "service": settings.service_name,
         "version": settings.service_version,

@@ -29,6 +29,11 @@ existing `CloudConcept`. See `docs/cloud-model.md`.
 
 ## Adding a tool
 
-All tool operations are simulated in V1. Implement the `Tool` interface in
-`src/devops_learn/tools/`, declare accurate `risk_level`/`is_destructive` metadata, and
-never bypass `ToolService.invoke`. See `docs/safety.md`.
+Implement the `Tool` interface in `src/devops_learn/tools/`, declare accurate
+`risk_level`/`is_destructive` metadata, and never bypass `ToolService.invoke`. Provide a
+`Simulated*Tool` for tests/offline use and a `Real*Tool` that shells out to the actual binary
+via an argument list (never `shell=True`), an explicit timeout, and
+`tools/_subprocess_safety.py`'s redaction. See `docs/safety.md` and `docs/development.md`.
+
+Any test needing real Azure credentials must be gated behind `RUN_AZURE_INTEGRATION_TESTS=1` so
+normal CI never attempts to reach Azure.

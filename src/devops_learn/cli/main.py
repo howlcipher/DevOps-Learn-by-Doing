@@ -7,21 +7,33 @@ from typing import Sequence
 
 from devops_learn.ai.anthropic_provider import AnthropicProvider
 from devops_learn.bootstrap import build_platform
-from devops_learn.cli.commands import analyze, explain, history, init, local, profile, review
+from devops_learn.cli.commands import (
+    analyze,
+    explain,
+    history,
+    init,
+    local,
+    profile,
+    review,
+    security,
+    terraform,
+)
 from devops_learn.config.settings import load_settings
 from devops_learn.domain.enums import ExecutionMode
 from devops_learn.learning.persistence.connection import connect
 from devops_learn.tools.approval import ApprovalGate, CliApprovalGate, ThresholdApprovalGate
 from devops_learn.tools.base import RiskLevel, Tool
-from devops_learn.tools.docker_tool import RealDockerTool
+from devops_learn.tools.docker_tool import RealDockerTool, SimulatedDockerTool
 from devops_learn.tools.git_tool import SimulatedGitTool
 from devops_learn.tools.kubernetes_tool import SimulatedKubernetesTool
-from devops_learn.tools.python_tool import RealPythonTool
-from devops_learn.tools.terraform_tool import SimulatedTerraformTool
+from devops_learn.tools.python_tool import RealPythonTool, SimulatedPythonTool
+from devops_learn.tools.terraform_tool import RealTerraformTool, SimulatedTerraformTool
 from devops_learn.tools.validation_tool import SimulatedValidationTool
 from devops_learn.tools.cloud_tool import SimulatedCloudTool
+from devops_learn.tools.policy_tool import PolicyTool
+from devops_learn.tools.security_scanner_tool import SecurityScannerTool
 
-_COMMAND_MODULES = (analyze, review, history, explain, profile, init, local)
+_COMMAND_MODULES = (analyze, review, history, explain, profile, init, local, terraform, security)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -69,6 +81,20 @@ def _approval_gate_for_args(args: argparse.Namespace) -> ApprovalGate:
 
 
 def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
+    if args.command == "security":
+        return {"security_scanner": SecurityScannerTool(), "security_policy": PolicyTool()}
+    if args.command == "terraform":
+        # This command only ever invokes the "terraform" tool -- keep the rest
+        # simulated rather than provisioning real python/docker tools it never uses.
+        return {
+            "python": SimulatedPythonTool(),
+            "git": SimulatedGitTool(),
+            "docker": SimulatedDockerTool(),
+            "terraform": RealTerraformTool(),
+            "kubernetes": SimulatedKubernetesTool(),
+            "cloud": SimulatedCloudTool(),
+            "validation": SimulatedValidationTool(),
+        }
     if getattr(args, "real_tools", False) or args.command == "local":
         return {
             "python": RealPythonTool(),

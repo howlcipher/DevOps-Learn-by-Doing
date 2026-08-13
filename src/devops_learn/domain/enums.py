@@ -149,6 +149,12 @@ class AuditEventType(Enum):
     VALIDATION_COMPLETED = "validation_completed"
     TERRAFORM_PLAN_STARTED = "terraform_plan_started"
     TERRAFORM_PLAN_COMPLETED = "terraform_plan_completed"
+    SECURITY_SCAN_STARTED = "security_scan_started"
+    SECURITY_SCAN_COMPLETED = "security_scan_completed"
+    SECURITY_GATE_EVALUATED = "security_gate_evaluated"
+    SECURITY_OVERRIDE_APPROVED = "security_override_approved"
+    REMEDIATION_PROPOSED = "remediation_proposed"
+    REMEDIATION_APPLIED = "remediation_applied"
     USER_APPROVED_PLAN = "user_approved_plan"
     TOOL_INVOKED = "tool_invoked"
     DEPLOYMENT_STARTED = "deployment_started"
@@ -158,3 +164,51 @@ class AuditEventType(Enum):
     DIAGNOSIS_PRODUCED = "diagnosis_produced"
     ROLLBACK_PERFORMED = "rollback_performed"
     SESSION_COMPLETED = "session_completed"
+
+
+class FindingSeverity(Enum):
+    UNKNOWN = "unknown"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class FindingCategory(Enum):
+    VULNERABILITY = "vulnerability"
+    SECRET = "secret"
+    IAC_MISCONFIGURATION = "iac_misconfiguration"
+    CONTAINER = "container"
+    DEPENDENCY = "dependency"
+    IDENTITY = "identity"
+    NETWORK = "network"
+    KUBERNETES = "kubernetes"
+    POLICY = "policy"
+    UNKNOWN = "unknown"
+
+
+class FindingChangeStatus(Enum):
+    INTRODUCED = "introduced"
+    RESOLVED = "resolved"
+    UNCHANGED = "unchanged"
+    UNCERTAIN = "uncertain"
+
+
+class SecurityGateDecision(Enum):
+    ALLOW = "allow"
+    WARN = "warn"
+    REQUIRE_APPROVAL = "require_approval"
+    BLOCK = "block"
+
+
+class RemediationRisk(Enum):
+    SAFE_TO_AUTO_FIX = "safe_to_auto_fix"
+    REQUIRES_REVIEW = "requires_review"
+    REQUIRES_HUMAN_INPUT = "requires_human_input"
+    HIGH_RISK = "high_risk"
+
+
+class DeploymentEligibility(Enum):
+    ELIGIBLE = "eligible"
+    INELIGIBLE = "ineligible"
+    PENDING_APPROVAL = "pending_approval"

@@ -48,4 +48,6 @@ class ExplanationService:
             lines.append(moment.why_it_matters)
         if depth >= ExplanationDepth.DEEP:
             lines.append(moment.deep_explanation)
+        if moment.related_artifact and depth >= ExplanationDepth.LEARNING:
+            lines.append(f"See: {moment.related_artifact}")
         return "\n".join(lines)

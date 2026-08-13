@@ -35,6 +35,11 @@ devops-learn init projects/api_platform
 # Real local vertical slice: test -> lint -> docker build -> run -> verify
 devops-learn local projects/api_platform
 
+# Real Terraform vertical slice: fmt -> init -> validate -> plan -> risk analysis
+# (plan requires Azure credentials -- az login, or ARM_CLIENT_ID/ARM_CLIENT_SECRET/
+# ARM_TENANT_ID/ARM_SUBSCRIPTION_ID -- and fails cleanly, with an explanation, without them)
+devops-learn terraform
+
 # Simulate the full cloud workflow (no credentials, no cost)
 devops-learn analyze projects/api_platform --mode collaborative --depth learning
 
@@ -84,7 +89,17 @@ declaration at construction time.
 
 Provide a `Simulated*Tool` for tests and environments where the real dependency is unavailable,
 and a `Real*Tool` that shells out to the actual binary. See `tools/python_tool.py` and
-`tools/docker_tool.py` for the pattern.
+`tools/docker_tool.py` for the base pattern, and `tools/terraform_tool.py` for a `Real*Tool`
+that also needs an explicit subprocess timeout and output redaction — reuse
+`tools/_subprocess_safety.py`'s `run_safely()`/`redact()` rather than calling `subprocess.run`
+directly, so secret-shaped output can never accidentally reach a `ToolResult` unredacted.
+
+Any future test that requires real Azure credentials must be gated behind
+`RUN_AZURE_INTEGRATION_TESTS=1` (e.g.
+`@pytest.mark.skipif(os.environ.get("RUN_AZURE_INTEGRATION_TESTS") != "1", reason="requires az
+login")`), so ordinary CI and `pytest` runs never attempt to reach Azure. Nothing in the
+platform needs this yet — it is the convention Milestone 3 (`docs/roadmap.md`) will use as soon
+as real Azure calls exist.
 
 ## Adding a workflow command
 

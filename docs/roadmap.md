@@ -26,15 +26,20 @@ allow-listed subprocess wrapper, gated by `ToolService.invoke`.
 offline/no-Docker environments. The `devops-learn local` command runs the full
 local vertical slice end to end and teaches Docker concepts in context.
 
-## Milestone 2: real Terraform workflow
+## Milestone 2: real Terraform workflow (done)
 
-Add `RealTerraformTool` shelling out to a real `terraform` binary for
-`fmt`/`validate`/`plan` against generated configuration, with structured
-parsing of `terraform show -json` feeding the existing
-`validation/terraform_plan_analysis.analyze()` risk classifier unchanged. No
-`apply` and no Azure credentials required yet;
-`apply_approved_plan`/`destroy_approved_environment` stay simulated until
-Milestone 3.
+`RealTerraformTool` (`tools/terraform_tool.py`) shells out to a real
+`terraform` binary for `fmt`/`init`/`validate`/`plan` against a real,
+committed configuration (`projects/api_platform/infra/terraform/`), with
+structured parsing of `terraform show -json` feeding the existing
+`validation/terraform_plan_analysis.analyze()` risk classifier unchanged.
+`devops-learn terraform` runs the full vertical slice (fmt -> init ->
+validate -> plan -> risk analysis) and teaches Terraform state, provider,
+and resource-address concepts just-in-time (`docs/terraform-state.md`). No
+`apply`; `apply_approved_plan`/`destroy_approved_environment` are not even
+declared on `RealTerraformTool` and stay simulated until Milestone 3. `plan`
+requires Azure authentication and fails cleanly, with an explanation, on a
+machine without it — `init`/`validate`/`fmt` need no credentials.
 
 ## Milestone 3: first Azure vertical slice
 
@@ -45,6 +50,17 @@ group and container registry first. Introduce AKS/Kubernetes only after this
 first real cloud execution path is reliable — not because Kubernetes is
 technically harder, but because a working real deployment path should exist
 before adding cluster-level complexity on top of it.
+
+## DevSecOps security control plane (done)
+
+Trivy-backed filesystem/config/image evidence normalizes into scanner-independent
+findings, compares a base Git state to the proposed state, and feeds inspectable
+Conftest policy. The deterministic gate includes structural secret redaction,
+audit/experience evidence, remediation classification, a report artifact, demo,
+and PR CI. See `docs/devsecops.md`.
+
+The next dependency is the real Terraform plan plus Azure deployment path,
+where this gate must be required before any real apply.
 
 ## Further out (not yet milestoned)
 

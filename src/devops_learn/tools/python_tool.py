@@ -7,8 +7,11 @@ Every operation reports whether it is REAL or SIMULATED in the result summary.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sys
+from pathlib import Path
 from typing import Any, Mapping
 
 from devops_learn.tools.approval import ApprovalRecord
@@ -40,18 +43,24 @@ _OPERATIONS = (
 
 
 def _python_executable() -> str:
-    return shutil.which("python3") or shutil.which("python") or "python"
+    """Use the interpreter running the platform, not an unrelated system Python."""
+    return sys.executable or shutil.which("python3") or shutil.which("python") or "python"
 
 
 def _run(
     command: list[str], *, cwd: str | None, check: bool = False
 ) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    # User-installed pytest plugins are outside a scanned project's dependency
+    # boundary and can make an otherwise valid local workflow non-deterministic.
+    environment.setdefault("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
     return subprocess.run(
         command,
         cwd=cwd,
         capture_output=True,
         text=True,
         check=check,
+        env=environment,
     )
 
 
@@ -130,18 +139,17 @@ class RealPythonTool(Tool):
         cwd: str | None = params.get("path")
         try:
             if operation == "run_tests":
-                command = [_python_executable(), "-m", "pytest"]
+                tests_path = (Path(cwd or ".").resolve() / "tests")
+                command = [_python_executable(), "-m", "pytest", str(tests_path)]
                 completed = _run(command, cwd=cwd)
                 success = completed.returncode == 0
                 summary = (
-                    completed.stdout.strip().splitlines()[-1]
-                    if completed.stdout
-                    else "no output"
+                    completed.stdout.strip().splitlines()[-1] if completed.stdout else "no output"
                 )
                 details = {"returncode": completed.returncode, "stderr": completed.stderr}
             elif operation == "run_lint":
                 lint_paths = params.get("paths", ["src", "tests"])
-                command = ["flake8"] + lint_paths
+                command = ["flake8", "--jobs", "1"] + lint_paths
                 completed = _run(command, cwd=cwd)
                 success = completed.returncode == 0
                 summary = completed.stdout.strip() or "No lint issues found"

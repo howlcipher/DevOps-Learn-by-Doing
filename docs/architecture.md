@@ -15,6 +15,7 @@ workflows/analyze_flow.py   sequences the services below for one engagement; no 
     +-- architecture.ArchitectureService  recommendations -> ArchitectureProposal (concept-first)
     +-- planning.PlanningService        proposal -> ImplementationPlan of Tool operations
     +-- validation.terraform_plan_analysis  pure risk classification of a Terraform plan
+    +-- security.normalize/change_analysis/policy  normalized security evidence and gate
     +-- troubleshooting.TroubleshootingService  gathers evidence, then diagnoses
     +-- tools.ToolService               the only entry point into any Tool
     +-- explanations.ExplanationService  renders Explanation/LearningMoment by mode+depth
@@ -24,6 +25,7 @@ workflows/analyze_flow.py   sequences the services below for one engagement; no 
     +-- learning.SessionService         EngagementSession lifecycle
     +-- learning.LearnerProfileService  stores skill profile and learning focus
     +-- workflows.local_flow            real local vertical slice (test -> Docker -> verify)
+    +-- workflows.security_flow         Trivy -> base comparison -> Conftest policy -> gate
     +-- ai.LLMProvider                  MockLLMProvider (default) or AnthropicProvider
 ```
 
@@ -51,6 +53,13 @@ never in whether a HIGH/DESTRUCTIVE tool operation requires approval
 `workflows/local_flow.py` implements a separate real local vertical slice (`devops-learn local`):
 inspect -> test -> lint -> Docker build -> run -> HTTP verify -> logs -> stop. It uses real
 `python` and `docker` tools while keeping cloud/Terraform/Kubernetes simulated.
+
+`workflows/security_flow.py` is the pre-deployment security stage. It invokes
+Trivy through `SecurityScannerTool`, normalizes redacted findings, compares an
+explicit Git base through a temporary archive, invokes Conftest through
+`PolicyTool`, records audit and experience evidence, and emits a sanitized
+report. Operational tool risk remains separate from the deployment decision.
+See `docs/devsecops.md`.
 
 ## Layers
 
