@@ -88,7 +88,6 @@ DESTRUCTIVE-adjacent operations in this platform's risk model (see
 ## Real vs. simulated in this platform
 
 `devops-learn terraform` runs real `fmt`/`init`/`validate`/`plan` against
-`projects/api_platform/infra/terraform/` and never applies or destroys.
-`apply_approved_plan`/`destroy_approved_environment` -- and therefore any
-real state file this platform would ever write -- stay simulated until
-Milestone 3. See `docs/safety.md` and `docs/roadmap.md`.
+`projects/api_platform/infra/terraform/`. The unified `deploy` command adds
+real-only saved-plan apply and the `destroy` command adds real-only cleanup.
+Both remain unverified in this checkout until an opt-in Azure acceptance run.

@@ -22,7 +22,8 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import tempfile
+from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -52,6 +53,7 @@ _OPERATIONS = (
         requires_approval=False,
         is_destructive=False,
     ),
+    ToolOperationSpec("output", RiskLevel.SAFE, False, False, False),
     ToolOperationSpec(
         name="apply_approved_plan",
         risk_level=RiskLevel.HIGH,
@@ -173,6 +175,21 @@ _REAL_OPERATIONS = (
         requires_approval=False,
         is_destructive=False,
     ),
+    ToolOperationSpec("output", RiskLevel.SAFE, False, False, False),
+    ToolOperationSpec(
+        name="apply_approved_plan",
+        risk_level=RiskLevel.HIGH,
+        supports_dry_run=False,
+        requires_approval=True,
+        is_destructive=False,
+    ),
+    ToolOperationSpec(
+        name="destroy_approved_environment",
+        risk_level=RiskLevel.DESTRUCTIVE,
+        supports_dry_run=False,
+        requires_approval=True,
+        is_destructive=True,
+    ),
 )
 
 
@@ -183,6 +200,62 @@ def _terraform_command() -> str:
             "Terraform CLI not found. Install Terraform or use simulation mode."
         )
     return command
+
+
+def _digest_file(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def terraform_config_digest(working_dir: Path) -> str:
+    """Hash committed Terraform inputs, never state or generated provider files."""
+    digest = sha256()
+    paths = sorted(
+        [*working_dir.glob("*.tf"), working_dir / ".terraform.lock.hcl"],
+        key=lambda path: path.name,
+    )
+    for path in paths:
+        if not path.is_file():
+            continue
+        digest.update(path.name.encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _controlled_plan_path(working_dir: Path, value: object | None) -> Path:
+    artifacts = (working_dir / ".devops_learn" / "plans").resolve()
+    candidate = Path(str(value)).resolve() if value is not None else artifacts / "terraform.tfplan"
+    if candidate.parent != artifacts or candidate.suffix != ".tfplan":
+        raise ValueError("Saved plans must be direct .tfplan files in .devops_learn/plans.")
+    artifacts.mkdir(parents=True, exist_ok=True)
+    return candidate
+
+
+def _plan_metadata_path(plan_path: Path) -> Path:
+    return plan_path.with_suffix(".tfplan.json")
+
+
+def _variable_args(params: Mapping[str, Any]) -> list[str]:
+    variables = params.get("variables", {})
+    if not isinstance(variables, Mapping):
+        raise ValueError("Terraform variables must be a mapping.")
+    allowed = {"deploy_application", "app_image"}
+    if set(variables) - allowed:
+        raise ValueError("Only deploy_application and app_image are accepted by this workflow.")
+    args: list[str] = []
+    for name in sorted(variables):
+        value = variables[name]
+        if name == "deploy_application" and not isinstance(value, bool):
+            raise ValueError("deploy_application must be boolean.")
+        if name == "app_image" and (not isinstance(value, str) or "@sha256:" not in value):
+            raise ValueError("app_image must be a digest-pinned image reference.")
+        args.extend(["-var", f"{name}={str(value).lower() if isinstance(value, bool) else value}"])
+    return args
 
 
 def _details_from_plan_json(plan_json: Mapping[str, Any]) -> dict[str, Any]:
@@ -219,16 +292,12 @@ def _details_from_plan_json(plan_json: Mapping[str, Any]) -> dict[str, Any]:
 
 
 class RealTerraformTool(Tool):
-    """Runs real terraform fmt/init/validate/plan via subprocess.
+    """Runs real Terraform only through bounded, auditable operations.
 
-    Deliberately does not declare apply_approved_plan or
-    destroy_approved_environment: those stay simulated until Milestone 3, per
-    docs/roadmap.md. A caller invoking either operation on this tool gets a
-    KeyError from Tool.spec_for rather than a result that looks real but
-    silently isn't -- apply/destroy remain real capabilities of the
-    "terraform" tool name only via SimulatedTerraformTool, exactly how
-    cli/main.py already selects real-vs-simulated per command today. See
-    docs/adr/0004-controlled-tool-execution.md.
+    Saved plans live under the working directory's ``.devops_learn/plans``.
+    Apply reads a metadata sidecar created by this tool and rejects a plan,
+    source, config, candidate, or digest mismatch before invoking Terraform.
+    There is no real-to-simulated fallback.
     """
 
     @property
@@ -260,7 +329,17 @@ class RealTerraformTool(Tool):
                 approval=approval,
             )
 
-        working_dir = params.get("path")
+        working_dir_value = params.get("path")
+        if not isinstance(working_dir_value, str) or not Path(working_dir_value).is_dir():
+            return ToolResult(
+                False,
+                "(real, failed) Terraform working directory is unavailable.",
+                {},
+                spec.risk_level,
+                dry_run,
+                approval,
+            )
+        working_dir = str(Path(working_dir_value).resolve())
         timeout_override = params.get("timeout_seconds")
 
         def _timeout(default: int) -> int:
@@ -275,8 +354,10 @@ class RealTerraformTool(Tool):
                     timeout=_timeout(30),
                 )
                 success = result.returncode == 0
-                summary = "Configuration already formatted" if success else (
-                    "Configuration needs formatting"
+                summary = (
+                    "Configuration already formatted"
+                    if success
+                    else ("Configuration needs formatting")
                 )
                 details: dict[str, Any] = {
                     "returncode": result.returncode,
@@ -327,59 +408,108 @@ class RealTerraformTool(Tool):
                     "diagnostic_count": len(diagnostics),
                     "stderr": result.stderr,
                 }
-            else:  # plan
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    plan_path = str(Path(tmp_dir) / "tfplan.out")
-                    plan_result = _subprocess_safety.run_safely(
-                        [terraform, "plan", "-input=false", "-no-color", f"-out={plan_path}"],
-                        cwd=working_dir,
-                        timeout=_timeout(180),
+            elif operation == "plan":
+                plan_path = _controlled_plan_path(Path(working_dir), params.get("plan_path"))
+                plan_result = _subprocess_safety.run_safely(
+                    [
+                        terraform,
+                        "plan",
+                        "-input=false",
+                        "-no-color",
+                        *_variable_args(params),
+                        f"-out={plan_path}",
+                    ],
+                    cwd=working_dir,
+                    timeout=_timeout(180),
+                )
+                if plan_result.returncode != 0:
+                    return ToolResult(
+                        False,
+                        "(real, failed) terraform plan failed",
+                        {
+                            "returncode": plan_result.returncode,
+                            "stdout": plan_result.stdout,
+                            "stderr": plan_result.stderr,
+                        },
+                        spec.risk_level,
+                        dry_run,
+                        approval,
                     )
-                    if plan_result.returncode != 0:
-                        return ToolResult(
-                            success=False,
-                            summary="(real, failed) terraform plan failed",
-                            details={
-                                "returncode": plan_result.returncode,
-                                "stdout": plan_result.stdout,
-                                "stderr": plan_result.stderr,
-                            },
-                            risk_level=spec.risk_level,
-                            was_dry_run=dry_run,
-                            approval=approval,
-                        )
-                    show_result = _subprocess_safety.run_safely(
-                        [terraform, "show", "-json", plan_path], cwd=working_dir, timeout=30
+                show_result = _subprocess_safety.run_safely(
+                    [terraform, "show", "-json", str(plan_path)], cwd=working_dir, timeout=30
+                )
+                if show_result.returncode != 0:
+                    return ToolResult(
+                        False,
+                        "(real, failed) terraform show -json failed",
+                        {
+                            "returncode": show_result.returncode,
+                            "stderr": show_result.stderr,
+                        },
+                        spec.risk_level,
+                        dry_run,
+                        approval,
                     )
-                    if show_result.returncode != 0:
-                        return ToolResult(
-                            success=False,
-                            summary="(real, failed) terraform show -json failed",
-                            details={
-                                "returncode": show_result.returncode,
-                                "stderr": show_result.stderr,
-                            },
-                            risk_level=spec.risk_level,
-                            was_dry_run=dry_run,
-                            approval=approval,
-                        )
-                    try:
-                        plan_json = json.loads(show_result.stdout)
-                    except json.JSONDecodeError:
-                        return ToolResult(
-                            success=False,
-                            summary="(real, failed) Could not parse terraform show -json output",
-                            details={"error": "malformed JSON from terraform show -json"},
-                            risk_level=spec.risk_level,
-                            was_dry_run=dry_run,
-                            approval=approval,
-                        )
-                    details = _details_from_plan_json(plan_json)
-                    success = True
-                    summary = (
-                        f"Plan: {details['create']} to add, {details['change']} to change, "
-                        f"{details['replace']} to replace, {details['destroy']} to destroy."
+                try:
+                    plan_json = json.loads(show_result.stdout)
+                except json.JSONDecodeError:
+                    return ToolResult(
+                        False,
+                        "(real, failed) Could not parse terraform show -json output",
+                        {"error": "malformed JSON from terraform show -json"},
+                        spec.risk_level,
+                        dry_run,
+                        approval,
                     )
+                details = _details_from_plan_json(plan_json)
+                plan_digest = _digest_file(plan_path)
+                metadata = {
+                    "candidate_context": params.get("candidate_context"),
+                    "config_digest": terraform_config_digest(Path(working_dir)),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "plan_digest": plan_digest,
+                    "source_revision": params.get("source_revision"),
+                }
+                _plan_metadata_path(plan_path).write_text(
+                    json.dumps(metadata, sort_keys=True) + "\n"
+                )
+                details.update(
+                    {"plan_path": str(plan_path), "plan_digest": plan_digest, **metadata}
+                )
+                success = True
+                summary = (
+                    f"Plan: {details['create']} to add, {details['change']} to change, "
+                    f"{details['replace']} to replace, {details['destroy']} to destroy."
+                )
+            elif operation == "output":
+                result = _subprocess_safety.run_safely(
+                    [terraform, "output", "-json"], cwd=working_dir, timeout=_timeout(30)
+                )
+                try:
+                    raw_outputs = json.loads(result.stdout) if result.stdout else {}
+                except json.JSONDecodeError:
+                    raw_outputs = {}
+                details = {
+                    name: value.get("value")
+                    for name, value in raw_outputs.items()
+                    if name
+                    in {
+                        "resource_group_name",
+                        "container_registry_login_server",
+                        "container_app_environment_name",
+                        "container_app_name",
+                        "container_app_endpoint",
+                    }
+                    and isinstance(value, dict)
+                }
+                success = result.returncode == 0
+                summary = "Terraform outputs collected" if success else "terraform output failed"
+            elif operation == "apply_approved_plan":
+                return self._apply(
+                    terraform, Path(working_dir), params, spec, approval, _timeout(300)
+                )
+            else:
+                return self._destroy(terraform, working_dir, params, spec, approval, _timeout(300))
         except (OSError, FileNotFoundError) as exc:
             return ToolResult(
                 success=False,
@@ -398,4 +528,101 @@ class RealTerraformTool(Tool):
             risk_level=spec.risk_level,
             was_dry_run=dry_run,
             approval=approval,
+        )
+
+    def _apply(
+        self,
+        terraform: str,
+        working_dir: Path,
+        params: Mapping[str, Any],
+        spec: ToolOperationSpec,
+        approval: ApprovalRecord | None,
+        timeout: int,
+    ) -> ToolResult:
+        try:
+            plan_path = _controlled_plan_path(working_dir, params.get("plan_path"))
+            metadata = json.loads(_plan_metadata_path(plan_path).read_text())
+            expected = {
+                "candidate_context": params.get("candidate_context"),
+                "source_revision": params.get("source_revision"),
+                "config_digest": terraform_config_digest(working_dir),
+                "plan_digest": _digest_file(plan_path),
+            }
+            if any(not value or metadata.get(key) != value for key, value in expected.items()):
+                return ToolResult(
+                    False,
+                    "(real, refused) approved plan evidence is stale or changed",
+                    {"reason": "candidate, source, configuration, or plan digest did not match"},
+                    spec.risk_level,
+                    False,
+                    approval,
+                )
+            result = _subprocess_safety.run_safely(
+                [terraform, "apply", "-input=false", "-no-color", str(plan_path)],
+                cwd=str(working_dir),
+                timeout=timeout,
+            )
+            return ToolResult(
+                result.returncode == 0,
+                "(real) approved Terraform plan applied"
+                if result.returncode == 0
+                else "(real, failed) terraform apply failed",
+                {
+                    "returncode": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "plan_digest": expected["plan_digest"],
+                },
+                spec.risk_level,
+                False,
+                approval,
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            return ToolResult(
+                False,
+                f"(real, refused) {exc}",
+                {"error": str(exc)},
+                spec.risk_level,
+                False,
+                approval,
+            )
+
+    def _destroy(
+        self,
+        terraform: str,
+        working_dir: str,
+        params: Mapping[str, Any],
+        spec: ToolOperationSpec,
+        approval: ApprovalRecord | None,
+        timeout: int,
+    ) -> ToolResult:
+        if not params.get("resource_group") or not params.get("environment"):
+            return ToolResult(
+                False,
+                "(real, refused) destroy requires resource group and environment identity",
+                {},
+                spec.risk_level,
+                False,
+                approval,
+            )
+        result = _subprocess_safety.run_safely(
+            [terraform, "destroy", "-input=false", "-auto-approve", "-no-color"],
+            cwd=working_dir,
+            timeout=timeout,
+        )
+        return ToolResult(
+            result.returncode == 0,
+            "(real) Terraform environment destroyed"
+            if result.returncode == 0
+            else "(real, failed) terraform destroy failed",
+            {
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "resource_group": str(params["resource_group"]),
+                "environment": str(params["environment"]),
+            },
+            spec.risk_level,
+            False,
+            approval,
         )

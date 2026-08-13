@@ -39,6 +39,13 @@ Project -> Analysis -> Requirements -> Questions -> Recommendations -> Architect
   evidence collection, compares an explicit Git base against the proposed
   state, applies Conftest policy, redacts secrets structurally, and prevents
   blocked changes from progressing toward deployment eligibility.
+- **Azure release lifecycle implementation** (`devops-learn deploy
+  projects/api_platform --cloud azure --depth learning`) composes validation,
+  image scanning, saved Terraform plans, candidate-bound approvals, ACR push,
+  Container Apps deployment, Azure observation, and HTTP health verification.
+  It is real-only and stops at preflight when credentials or required tools are
+  absent. It has not been executed from this checkout because Azure CLI,
+  Docker, Trivy, and Conftest are unavailable here.
 - **Competency evidence tracking**: records what you were exposed to, practiced,
   or demonstrated, not fabricated certification.
 
@@ -66,6 +73,12 @@ devops-learn local projects/api_platform
 # Run a real Terraform vertical slice: fmt -> init -> validate -> plan -> risk analysis
 # (plan requires Azure credentials; fails cleanly with an explanation without them)
 devops-learn terraform
+
+# Run the complete real-only Azure lifecycle after `az login` and tool preflight.
+devops-learn deploy projects/api_platform --cloud azure --depth learning
+
+# Explicitly approve and verify cleanup when finished learning.
+devops-learn destroy projects/api_platform
 
 # Check security prerequisites, then scan a proposed change against its base
 devops-learn security doctor

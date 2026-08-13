@@ -6,6 +6,7 @@ script covers every scenario instead of one file per case. Never touches
 real infrastructure; only prints canned output and writes a placeholder
 plan file when asked to `-out=`.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,7 @@ SCENARIO = os.environ.get("FAKE_TERRAFORM_SCENARIO", "success")
 def _plan_out_path(args: list[str]) -> str | None:
     for arg in args:
         if arg.startswith("-out="):
-            return arg[len("-out="):]
+            return arg[len("-out=") :]
     return None
 
 
@@ -35,7 +36,7 @@ def main() -> int:
 
     if subcommand == "fmt":
         if SCENARIO == "fmt_needs_formatting":
-            print("main.tf\n+  location = \"eastus\"", file=sys.stdout)
+            print('main.tf\n+  location = "eastus"', file=sys.stdout)
             return 3
         return 0
 
@@ -48,10 +49,16 @@ def main() -> int:
 
     if subcommand == "validate":
         if SCENARIO == "validate_failure":
-            print(json.dumps({
-                "valid": False,
-                "diagnostics": [{"severity": "error", "summary": "Missing required argument"}],
-            }))
+            print(
+                json.dumps(
+                    {
+                        "valid": False,
+                        "diagnostics": [
+                            {"severity": "error", "summary": "Missing required argument"}
+                        ],
+                    }
+                )
+            )
             return 1
         print(json.dumps({"valid": True, "diagnostics": []}))
         return 0
@@ -80,47 +87,81 @@ def main() -> int:
             print("{not valid json")
             return 0
         if SCENARIO == "plan_with_sensitive_attribute":
-            print(json.dumps({
-                "resource_changes": [
+            print(
+                json.dumps(
                     {
-                        "address": "azurerm_resource_group.main",
-                        "change": {"actions": ["create"]},
-                    },
-                    {
-                        "address": "azurerm_key_vault_secret.admin",
-                        "change": {
-                            "actions": ["create"],
-                            "after": {"admin_password": "hunter2"},
-                        },
-                    },
-                ]
-            }))
+                        "resource_changes": [
+                            {
+                                "address": "azurerm_resource_group.main",
+                                "change": {"actions": ["create"]},
+                            },
+                            {
+                                "address": "azurerm_key_vault_secret.admin",
+                                "change": {
+                                    "actions": ["create"],
+                                    "after": {"admin_password": "hunter2"},
+                                },
+                            },
+                        ]
+                    }
+                )
+            )
             return 0
         if SCENARIO == "plan_mixed_actions":
-            print(json.dumps({
-                "resource_changes": [
-                    {"address": "azurerm_resource_group.main",
-                     "change": {"actions": ["create"]}},
-                    {"address": "azurerm_container_registry.main",
-                     "change": {"actions": ["update"]}},
-                    {"address": "azurerm_log_analytics_workspace.main",
-                     "change": {"actions": ["delete", "create"]}},
-                    {"address": "azurerm_storage_account.old",
-                     "change": {"actions": ["delete"]}},
-                    {"address": "azurerm_resource_group.untouched",
-                     "change": {"actions": ["no-op"]}},
-                ]
-            }))
+            print(
+                json.dumps(
+                    {
+                        "resource_changes": [
+                            {
+                                "address": "azurerm_resource_group.main",
+                                "change": {"actions": ["create"]},
+                            },
+                            {
+                                "address": "azurerm_container_registry.main",
+                                "change": {"actions": ["update"]},
+                            },
+                            {
+                                "address": "azurerm_log_analytics_workspace.main",
+                                "change": {"actions": ["delete", "create"]},
+                            },
+                            {
+                                "address": "azurerm_storage_account.old",
+                                "change": {"actions": ["delete"]},
+                            },
+                            {
+                                "address": "azurerm_resource_group.untouched",
+                                "change": {"actions": ["no-op"]},
+                            },
+                        ]
+                    }
+                )
+            )
             return 0
         # default "success" scenario: two creates
-        print(json.dumps({
-            "resource_changes": [
-                {"address": "azurerm_resource_group.main",
-                 "change": {"actions": ["create"]}},
-                {"address": "azurerm_container_registry.main",
-                 "change": {"actions": ["create"]}},
-            ]
-        }))
+        print(
+            json.dumps(
+                {
+                    "resource_changes": [
+                        {
+                            "address": "azurerm_resource_group.main",
+                            "change": {"actions": ["create"]},
+                        },
+                        {
+                            "address": "azurerm_container_registry.main",
+                            "change": {"actions": ["create"]},
+                        },
+                    ]
+                }
+            )
+        )
+        return 0
+
+    if subcommand in {"apply", "destroy"}:
+        print(f"{subcommand.title()} complete!")
+        return 0
+
+    if subcommand == "output":
+        print(json.dumps({}))
         return 0
 
     return 1

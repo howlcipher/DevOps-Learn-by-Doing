@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1020">
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <meta name="description" content="DevOps Learn by Doing is a simulation-first CLI that teaches DevOps through a production-style Python API project with progressive AI assistance.">
+  <meta name="description" content="DevOps Learn by Doing is an AI-assisted CLI for learning DevOps through a security-gated Azure deployment lifecycle and a production-style Python API project.">
   <meta property="og:image" content="https://howlcipher.github.io/DevOps-Learn-by-Doing/assets/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://howlcipher.github.io/DevOps-Learn-by-Doing/assets/social-preview.png">
@@ -596,10 +596,11 @@
         <div>
           <div class="section-head">
             <div class="label">03 // Truthful status</div>
-            <h2>Real local execution. Simulated cloud.</h2>
+            <h2>Real local execution. Real-only Azure lifecycle.</h2>
             <p>
-              The boundary is deliberate: local Python and Docker work is real, while Azure,
-              Terraform apply, and Kubernetes remain simulated until the next milestone.
+              The boundary is deliberate: local work, saved Terraform plans, and the Azure
+              lifecycle implementation are real-only. Azure execution remains opt-in and is
+              never claimed as verified until a credentialed run succeeds.
             </p>
           </div>
 
@@ -618,7 +619,7 @@
             </div>
             <div class="status-row">
               <span class="badge sim">Sim</span>
-              <p>Azure provisioning, Terraform apply, kubectl, and cloud API calls are simulated.</p>
+              <p>Azure provisioning and Terraform apply require explicit approval and opt-in credentials; Kubernetes remains simulated.</p>
             </div>
           </div>
         </div>
@@ -663,11 +664,11 @@
           </article>
           <article class="card">
             <h3>Real Terraform validation</h3>
-            <p>Use the Terraform binary for validate/plan while Azure apply/destroy remains simulated.</p>
+            <p>Use saved Terraform plans with explicit approval before real-only apply and verified cleanup.</p>
           </article>
           <article class="card">
-            <h3>First real Azure path</h3>
-            <p>Provision learner-owned Azure resources behind approval gates, then extend into real Kubernetes fundamentals.</p>
+            <h3>Azure lifecycle acceptance run</h3>
+            <p>Exercise the real, approval-controlled Container Apps path and independently verify cleanup.</p>
           </article>
         </div>
       </div>

@@ -134,10 +134,11 @@ the bundled real FastAPI project, uploads the sanitized report, and never uses
 Azure credentials or runs `terraform apply`. GitHub PR metadata supplies the
 base SHA, not `HEAD~1`.
 
-The future real path is: Terraform fmt, validate, plan, plan JSON risk
-analysis, Trivy IaC/plan scan, normalized change-aware findings, Conftest
-policy, deployment eligibility, human plan approval, real apply, then Azure
-verification. Azure and apply are not implemented by this milestone.
+The real-only `deploy` path composes Terraform fmt, validate and saved plan,
+plan JSON risk analysis, Trivy filesystem/config/image evidence, normalized
+change-aware findings, Conftest policy, deployment eligibility, human approval,
+candidate-bound real apply, Azure observation, and health verification. It is
+not marked live-verified until an opt-in Azure run succeeds.
 
 ## Limitations
 
