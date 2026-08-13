@@ -1,7 +1,9 @@
 # infra/terraform
 
-This is a real, valid Terraform configuration for a minimal Azure footprint:
-a resource group, a container registry, and a Log Analytics workspace.
+This is a real, valid Terraform configuration for a minimal Azure Container
+Apps learning footprint: a resource group, container registry, managed
+identity with `AcrPull`, Log Analytics workspace, Container Apps Environment,
+and (after the image stage) the FastAPI Container App.
 
 ## Files in this directory
 

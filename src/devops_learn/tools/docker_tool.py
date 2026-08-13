@@ -8,9 +8,9 @@ operations. Every result clearly indicates REAL or SIMULATED.
 from __future__ import annotations
 
 import shutil
-import subprocess
 from typing import Any, Mapping
 
+from devops_learn.tools import _subprocess_safety
 from devops_learn.tools.approval import ApprovalRecord
 from devops_learn.tools.base import RiskLevel, Tool, ToolOperationSpec, ToolResult
 
@@ -62,13 +62,9 @@ def _docker_command() -> str:
     return command
 
 
-def _run(command: list[str], *, check: bool = False) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        check=check,
-    )
+def _run(command: list[str]) -> _subprocess_safety.SafeRunResult:
+    """Run a bounded Docker command without exposing raw CLI output."""
+    return _subprocess_safety.run_safely(command, cwd=None, timeout=180)
 
 
 class SimulatedDockerTool(Tool):

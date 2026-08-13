@@ -7,19 +7,23 @@
 locals {
   tags = {
     project     = "devops-learn-by-doing"
-    environment = "learning"
+    environment = var.environment
     managed-by  = "terraform"
     purpose     = "devops-learning"
   }
 
+  resource_prefix = "${var.project_name}-${var.environment}"
+
   # Azure Container Registry names must be alphanumeric only (no hyphens),
   # unlike most other Azure resource names -- strip them here rather than
   # relaxing var.project_name itself.
-  registry_name = replace(var.project_name, "-", "")
+  registry_name = "${replace(local.resource_prefix, "-", "")}${substr(md5(data.azurerm_client_config.current.subscription_id), 0, 6)}acr"
 }
 
+data "azurerm_client_config" "current" {}
+
 resource "azurerm_resource_group" "main" {
-  name     = "${var.project_name}-rg"
+  name     = "${local.resource_prefix}-rg"
   location = var.location
   tags     = local.tags
 }
@@ -33,7 +37,7 @@ resource "azurerm_container_registry" "main" {
 }
 
 resource "azurerm_user_assigned_identity" "container_app" {
-  name                = "${var.project_name}-app-identity"
+  name                = "${local.resource_prefix}-app-identity"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   tags                = local.tags
@@ -46,7 +50,7 @@ resource "azurerm_role_assignment" "container_app_acr_pull" {
 }
 
 resource "azurerm_log_analytics_workspace" "main" {
-  name                = "${var.project_name}-logs"
+  name                = "${local.resource_prefix}-logs"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   sku                 = "PerGB2018"
@@ -55,7 +59,7 @@ resource "azurerm_log_analytics_workspace" "main" {
 }
 
 resource "azurerm_container_app_environment" "main" {
-  name                       = "${var.project_name}-env"
+  name                       = "${local.resource_prefix}-env"
   resource_group_name        = azurerm_resource_group.main.name
   location                   = azurerm_resource_group.main.location
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
@@ -64,7 +68,7 @@ resource "azurerm_container_app_environment" "main" {
 
 resource "azurerm_container_app" "api" {
   count                        = var.deploy_application ? 1 : 0
-  name                         = "${var.project_name}-api"
+  name                         = "${local.resource_prefix}-api"
   resource_group_name          = azurerm_resource_group.main.name
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"

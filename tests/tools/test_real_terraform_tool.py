@@ -208,6 +208,7 @@ def test_saved_plan_binds_digest_source_config_and_candidate(monkeypatch, tmp_pa
             "plan_path": planned.details["plan_path"],
             "source_revision": "source-a",
             "candidate_context": "candidate-a",
+            "candidate_identity": "candidate-identity-a",
         },
         dry_run=False,
         approval=approved,
@@ -231,6 +232,7 @@ def test_apply_refuses_changed_source_or_plan(monkeypatch, tmp_path) -> None:
             "plan_path": planned.details["plan_path"],
             "source_revision": "source-b",
             "candidate_context": "candidate-a",
+            "candidate_identity": "candidate-identity-a",
         },
         dry_run=False,
         approval=ApprovalRecord(granted=True, approved_by="test"),
@@ -244,11 +246,36 @@ def test_apply_refuses_changed_source_or_plan(monkeypatch, tmp_path) -> None:
             "plan_path": planned.details["plan_path"],
             "source_revision": "source-a",
             "candidate_context": "candidate-a",
+            "candidate_identity": "candidate-identity-a",
         },
         dry_run=False,
         approval=ApprovalRecord(granted=True, approved_by="test"),
     )
     assert not changed_plan.success
+
+
+def test_apply_refuses_missing_candidate_identity(monkeypatch, tmp_path) -> None:
+    _use_fake_terraform(monkeypatch)
+    tool = RealTerraformTool()
+    planned = tool.execute(
+        "plan",
+        {"path": str(tmp_path), "source_revision": "source-a", "candidate_context": "candidate-a"},
+        dry_run=False,
+        approval=None,
+    )
+    result = tool.execute(
+        "apply_approved_plan",
+        {
+            "path": str(tmp_path),
+            "plan_path": planned.details["plan_path"],
+            "source_revision": "source-a",
+            "candidate_context": "candidate-a",
+        },
+        dry_run=False,
+        approval=ApprovalRecord(granted=True, approved_by="test"),
+    )
+    assert not result.success
+    assert "candidate identity" in result.summary
 
 
 def test_dry_run_never_invokes_subprocess(monkeypatch, tmp_path) -> None:
