@@ -13,6 +13,7 @@ from typing import Any, Mapping
 from devops_learn.domain.audit_models import AuditEvent
 from devops_learn.domain.enums import AuditEventType
 from devops_learn.learning.persistence.repositories.audit_repository import AuditRepository
+from devops_learn.security.redaction import redact_data
 
 
 class AuditService:
@@ -35,7 +36,7 @@ class AuditService:
             event_type=event_type,
             occurred_at=occurred_at,
             summary=summary,
-            payload=payload or {},
+            payload=redact_data(payload or {}),
         )
         return self._audit_repository.append(event)
 

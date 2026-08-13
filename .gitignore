@@ -13,6 +13,7 @@ htmlcov/
 *.sqlite3
 .env
 .devops_learn/
+artifacts/security/
 
 # Terraform working-directory artifacts (see projects/api_platform/infra/terraform/).
 # .terraform.lock.hcl is deliberately NOT listed here: it pins exact provider

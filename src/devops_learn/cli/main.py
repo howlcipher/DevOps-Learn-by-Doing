@@ -15,6 +15,7 @@ from devops_learn.cli.commands import (
     local,
     profile,
     review,
+    security,
     terraform,
 )
 from devops_learn.config.settings import load_settings
@@ -29,8 +30,10 @@ from devops_learn.tools.python_tool import RealPythonTool, SimulatedPythonTool
 from devops_learn.tools.terraform_tool import RealTerraformTool, SimulatedTerraformTool
 from devops_learn.tools.validation_tool import SimulatedValidationTool
 from devops_learn.tools.cloud_tool import SimulatedCloudTool
+from devops_learn.tools.policy_tool import PolicyTool
+from devops_learn.tools.security_scanner_tool import SecurityScannerTool
 
-_COMMAND_MODULES = (analyze, review, history, explain, profile, init, local, terraform)
+_COMMAND_MODULES = (analyze, review, history, explain, profile, init, local, terraform, security)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -78,6 +81,8 @@ def _approval_gate_for_args(args: argparse.Namespace) -> ApprovalGate:
 
 
 def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
+    if args.command == "security":
+        return {"security_scanner": SecurityScannerTool(), "security_policy": PolicyTool()}
     if args.command == "terraform":
         # This command only ever invokes the "terraform" tool -- keep the rest
         # simulated rather than provisioning real python/docker tools it never uses.

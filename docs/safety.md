@@ -21,6 +21,11 @@
   profile are real.
 - The reference Dockerfile, Terraform configuration, Kubernetes manifest, and GitHub Actions
   workflow under `templates/` are real, valid configuration files, shown as examples.
+- `devops-learn security scan` is real, read-only local Trivy and Conftest execution when those
+  binaries are available. It does not install tools, alter the working tree, apply Terraform, or
+  contact Azure. Base refs are materialized with a temporary Git archive. Scanner evidence is
+  structurally redacted before it reaches reports, console output, audit events, or explanations;
+  raw scanner JSON is never persisted.
 
 ## What is simulated
 

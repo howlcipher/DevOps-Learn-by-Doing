@@ -51,6 +51,17 @@ first real cloud execution path is reliable — not because Kubernetes is
 technically harder, but because a working real deployment path should exist
 before adding cluster-level complexity on top of it.
 
+## DevSecOps security control plane (done)
+
+Trivy-backed filesystem/config/image evidence normalizes into scanner-independent
+findings, compares a base Git state to the proposed state, and feeds inspectable
+Conftest policy. The deterministic gate includes structural secret redaction,
+audit/experience evidence, remediation classification, a report artifact, demo,
+and PR CI. See `docs/devsecops.md`.
+
+The next dependency is the real Terraform plan plus Azure deployment path,
+where this gate must be required before any real apply.
+
 ## Further out (not yet milestoned)
 
 - Real AWS/GCP `CloudProvider` implementations.

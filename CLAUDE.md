@@ -56,6 +56,9 @@ output parsed at runtime.
   tools shell out to a narrow, allow-listed set of operations via argument
   arrays (never `shell=True`) — see `tools/docker_tool.py`,
   `tools/python_tool.py`, `tools/terraform_tool.py`.
+- Security scanner output is evidence, not security truth from an LLM. Normalize and structurally
+  redact it before any console, audit, report, or explanation path; policy decisions are
+  deterministic and introduced findings must remain distinct from historical debt.
 
 ## Product direction
 

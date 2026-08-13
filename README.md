@@ -35,6 +35,10 @@ Project -> Analysis -> Requirements -> Questions -> Recommendations -> Architect
 - **Controlled tool execution**: every capability is a `Tool` with declared
   risk level, dry-run support, and human approval; `ToolService` is the only
   caller of `Tool.execute`.
+- **DevSecOps security gate** (`devops-learn security scan`) runs real Trivy
+  evidence collection, compares an explicit Git base against the proposed
+  state, applies Conftest policy, redacts secrets structurally, and prevents
+  blocked changes from progressing toward deployment eligibility.
 - **Competency evidence tracking**: records what you were exposed to, practiced,
   or demonstrated, not fabricated certification.
 
@@ -62,6 +66,10 @@ devops-learn local projects/api_platform
 # Run a real Terraform vertical slice: fmt -> init -> validate -> plan -> risk analysis
 # (plan requires Azure credentials; fails cleanly with an explanation without them)
 devops-learn terraform
+
+# Check security prerequisites, then scan a proposed change against its base
+devops-learn security doctor
+devops-learn security scan projects/api_platform --base-ref origin/main
 
 # Simulate the full cloud workflow (no credentials, no cost)
 devops-learn analyze projects/api_platform --mode collaborative --depth learning
@@ -150,6 +158,7 @@ freeform explanation text (`docs/adr/0008-structured-ai-output.md`).
 - `docs/cloud-model.md` the concept-first, multi-cloud abstraction.
 - `docs/safety.md` simulation vs. real execution, approval gating, risk levels.
 - `docs/roadmap.md` the next milestones.
+- `docs/devsecops.md` security evidence, policy gate, secret safety, CI, and demo.
 - `docs/adr/` architecture decision records.
 
 ## Development
