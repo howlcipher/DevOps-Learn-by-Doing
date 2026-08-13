@@ -121,6 +121,7 @@ def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
         }
     if args.command in {"deploy", "destroy"}:
         return {
+            "doctor": EnvironmentDoctorTool(),
             "python": RealPythonTool(),
             "git": SimulatedGitTool(),
             "docker": RealDockerTool(),

@@ -16,6 +16,7 @@ from devops_learn.domain.question_models import ClarifyingQuestion
 from devops_learn.tools.approval import AutoApproveApprovalGate
 from devops_learn.tools.terraform_tool import RealTerraformTool, terraform_config_digest
 from devops_learn.workflows.deploy_flow import _plan_and_gate
+from devops_learn.workflows.deploy_flow import DeployOptions, _preflight
 from devops_learn.workflows.ui import Ui
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "fake_terraform"
@@ -114,3 +115,31 @@ def test_required_security_and_cloud_approval_bind_the_saved_plan(
     assert result.human_approvals == ("security", "cloud_action")
     assert result.terraform_plan_path is not None
     assert Path(result.terraform_plan_path).is_file()
+
+
+def test_deploy_preflight_reuses_doctor_before_azure_authentication() -> None:
+    class ToolService:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def invoke(
+            self, tool: str, operation: str, params: dict[str, object] | None = None
+        ):
+            self.calls.append((tool, operation))
+            if tool == "doctor":
+                return type(
+                    "Result",
+                    (),
+                    {"details": {"checks": {"python": {"available": False}}}},
+                )()
+            return type("Result", (), {"success": False, "summary": "unavailable"})()
+
+    tool_service = ToolService()
+    platform = type("Platform", (), {"tool_service": tool_service})()
+    ui = ScriptedUi([])
+
+    assert not _preflight(
+        platform, ui, DeployOptions("projects/api_platform", environment="azure-integration")
+    )
+    assert ("azure", "preflight") not in tool_service.calls
+    assert "DEVOPS-LEARN DOCTOR" in "\n".join(ui.presented)
