@@ -108,7 +108,7 @@ def run_analysis(platform: Platform, ui: Ui, options: AnalyzeOptions) -> Engagem
             platform.session_service.complete(session)
             return session
 
-    plan = platform.planning_service.build_plan(architecture)
+    plan = platform.planning_service.build_plan(architecture, language=assessment.language)
     platform.audit_service.record(
         session_id=session_id,
         event_type=AuditEventType.PLAN_CREATED,
@@ -332,6 +332,11 @@ def _record_experience_for_step(platform: Platform, session_id: int, step: PlanS
         ("kubernetes", "get_pods"): ("Kubernetes", "Reviewed pod status"),
         ("python", "run_tests"): ("Testing", "Ran automated tests"),
         ("python", "run_lint"): ("Testing", "Ran lint checks"),
+        ("go", "run_tests"): ("Testing", "Ran automated tests"),
+        ("go", "run_vet"): ("Testing", "Ran static analysis (go vet)"),
+        ("go", "run_fmt_check"): ("Testing", "Ran format check (gofmt)"),
+        ("go", "run_build"): ("Build", "Compiled Go application"),
+        ("go", "verify_modules"): ("Dependencies", "Verified Go module integrity"),
         ("cloud", "list_resources"): ("Cloud", "Reviewed provisioned resources"),
     }
     entry = mapping.get((step.tool_name, step.operation))

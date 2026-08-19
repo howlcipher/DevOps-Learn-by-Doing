@@ -23,6 +23,7 @@ from devops_learn.domain.enums import (
     ExecutionMode,
     ExperienceState,
     ExplanationDepth,
+    LanguageKind,
 )
 from devops_learn.domain.explanation_models import Explanation
 from devops_learn.domain.learner_profile_models import CompetencyArea
@@ -65,21 +66,110 @@ def run_local_flow(
     ui.present(presenters.render_assessment(assessment))
     _teach_if_beginner(platform, ui, session_id, "docker", "Docker", _docker_intro())
 
-    _run_python_step(
-        platform, ui, session_id, "run_tests", {"path": options.project_root}, "Tests"
-    )
-    _run_python_step(
-        platform,
-        ui,
-        session_id,
-        "run_lint",
-        {"path": options.project_root, "paths": ["."]},
-        "Lint",
-    )
+    if assessment.language is LanguageKind.GO:
+        _teach_if_beginner(platform, ui, session_id, "go", "Go toolchain", _go_intro())
 
-    _teach_if_beginner(
-        platform, ui, session_id, "docker", "Dockerfile", _dockerfile_intro()
-    )
+        fmt_res = _run_go_step(
+            platform,
+            ui,
+            session_id,
+            "run_fmt_check",
+            {"path": options.project_root},
+            "Format check",
+            _go_fmt_explanation(),
+        )
+        if not fmt_res.success:
+            _diagnose_and_cleanup(
+                platform, ui, session_id, options, fmt_res, "Go format check failed"
+            )
+            platform.session_service.complete(session)
+            return session
+
+        vet_res = _run_go_step(
+            platform,
+            ui,
+            session_id,
+            "run_vet",
+            {"path": options.project_root},
+            "Static analysis (go vet)",
+            _go_vet_explanation(),
+        )
+        if not vet_res.success:
+            _diagnose_and_cleanup(
+                platform, ui, session_id, options, vet_res, "Go vet failed"
+            )
+            platform.session_service.complete(session)
+            return session
+
+        test_res = _run_go_step(
+            platform,
+            ui,
+            session_id,
+            "run_tests",
+            {"path": options.project_root},
+            "Unit tests (go test)",
+            _go_test_explanation(),
+        )
+        if not test_res.success:
+            _diagnose_and_cleanup(
+                platform, ui, session_id, options, test_res, "Go tests failed"
+            )
+            platform.session_service.complete(session)
+            return session
+
+        build_res = _run_go_step(
+            platform,
+            ui,
+            session_id,
+            "run_build",
+            {"path": options.project_root},
+            "Compile (go build)",
+            _go_build_explanation(),
+        )
+        if not build_res.success:
+            _diagnose_and_cleanup(
+                platform, ui, session_id, options, build_res, "Go build failed"
+            )
+            platform.session_service.complete(session)
+            return session
+
+        _teach_if_beginner(
+            platform,
+            ui,
+            session_id,
+            "docker",
+            "Multi-stage Dockerfile",
+            _dockerfile_multistage_intro(),
+        )
+    else:
+        test_res = _run_python_step(
+            platform, ui, session_id, "run_tests", {"path": options.project_root}, "Tests"
+        )
+        if not test_res.success:
+            _diagnose_and_cleanup(
+                platform, ui, session_id, options, test_res, "Tests failed"
+            )
+            platform.session_service.complete(session)
+            return session
+
+        lint_res = _run_python_step(
+            platform,
+            ui,
+            session_id,
+            "run_lint",
+            {"path": options.project_root, "paths": ["."]},
+            "Lint",
+        )
+        if not lint_res.success:
+            _diagnose_and_cleanup(
+                platform, ui, session_id, options, lint_res, "Lint failed"
+            )
+            platform.session_service.complete(session)
+            return session
+
+        _teach_if_beginner(
+            platform, ui, session_id, "docker", "Dockerfile", _dockerfile_intro()
+        )
 
     build_result = _run_docker_step(
         platform,
@@ -128,19 +218,33 @@ def run_local_flow(
     else:
         verify_result = _verify_endpoint(options)
         ui.present(verify_result)
-        platform.audit_service.record(
-            session_id=session_id,
-            event_type=AuditEventType.DEPLOYMENT_SUCCEEDED,
-            occurred_at=_now(),
-            summary="Local health check passed",
-        )
-        platform.experience_tracker.record(
-            session_id,
-            "Docker",
-            "Verified running container",
-            ExperienceState.PRACTICED,
-        )
-        _show_logs(platform, ui, session_id, options)
+        if verify_result.startswith("Health check OK"):
+            platform.audit_service.record(
+                session_id=session_id,
+                event_type=AuditEventType.DEPLOYMENT_SUCCEEDED,
+                occurred_at=_now(),
+                summary="Local health check passed",
+            )
+            platform.experience_tracker.record(
+                session_id,
+                "Docker",
+                "Verified running container",
+                ExperienceState.PRACTICED,
+            )
+            _show_logs(platform, ui, session_id, options)
+        else:
+            platform.audit_service.record(
+                session_id=session_id,
+                event_type=AuditEventType.DEPLOYMENT_FAILED,
+                occurred_at=_now(),
+                summary="Local health check failed",
+            )
+            platform.experience_tracker.record(
+                session_id,
+                "Troubleshooting",
+                "Investigated health check failure",
+                ExperienceState.INTRODUCED,
+            )
 
     _stop_container(platform, ui, session_id, options)
     _print_history_and_experience(platform, ui, session_id)
@@ -180,10 +284,42 @@ def _run_python_step(
         session_id,
         AuditEventType.TOOL_INVOKED,
         f"python.{operation}",
-        {"success": result.success},
+        {"success": result.success, "tool": "python"},
     )
     platform.experience_tracker.record(
         session_id, "Python", f"Ran {operation}", ExperienceState.PRACTICED
+    )
+    return result
+
+
+def _run_go_step(
+    platform: Platform,
+    ui: Ui,
+    session_id: int,
+    operation: str,
+    params: dict[str, Any],
+    label: str,
+    explanation: Explanation,
+) -> ToolResult:
+    _explain(platform, ui, label, explanation)
+    result = platform.tool_service.invoke("go", operation, params)
+    ui.present(result.summary)
+    _audit(
+        platform,
+        session_id,
+        AuditEventType.TOOL_INVOKED,
+        f"go.{operation}",
+        {"success": result.success, "tool": "go"},
+    )
+    experience_item = {
+        "run_fmt_check": "Ran format check (gofmt)",
+        "run_vet": "Ran static analysis (go vet)",
+        "run_tests": "Ran Go tests",
+        "run_build": "Compiled Go application",
+        "verify_modules": "Verified Go module integrity",
+    }.get(operation, f"Ran {operation}")
+    platform.experience_tracker.record(
+        session_id, "Go", experience_item, ExperienceState.PRACTICED
     )
     return result
 
@@ -424,4 +560,67 @@ def _verify_intro() -> str:
         "After starting a container, verify it actually works. A health endpoint "
         "like /health tells you the application is alive and able to respond to "
         "requests."
+    )
+
+
+def _go_intro() -> str:
+    return (
+        "Go compiles directly to machine code producing a self-contained static binary. "
+        "Unlike interpreted stacks, there is no runtime VM or interpreter needed in "
+        "the final container, enabling minimal attack surfaces and fast startup times."
+    )
+
+
+def _dockerfile_multistage_intro() -> str:
+    return (
+        "Multi-stage Docker builds separate the build environment from the runtime "
+        "environment. The builder stage compiles the static Go binary with the full SDK, "
+        "while the final stage copies only the binary into a minimal non-root image."
+    )
+
+
+def _go_fmt_explanation() -> Explanation:
+    return Explanation(
+        action="Checking Go source formatting with gofmt.",
+        why="Standardized formatting ensures consistency and prevents formatting diffs in CI/CD.",
+        what_to_understand="gofmt is deterministic and standard across all Go codebases.",
+    )
+
+
+def _go_vet_explanation() -> Explanation:
+    return Explanation(
+        action="Running static analysis with go vet.",
+        why=(
+            "go vet detects suspicious constructs, potential runtime bugs, and "
+            "API misuse before testing."
+        ),
+        what_to_understand=(
+            "Static analysis catches bugs that compile successfully but are logically flawed."
+        ),
+    )
+
+
+def _go_test_explanation() -> Explanation:
+    return Explanation(
+        action="Running Go unit tests.",
+        why=(
+            "Unit tests verify endpoint handlers and configuration logic before "
+            "container packaging."
+        ),
+        what_to_understand=(
+            "go test runs package-level test suites to guarantee functional correctness."
+        ),
+    )
+
+
+def _go_build_explanation() -> Explanation:
+    return Explanation(
+        action="Compiling Go binary with go build.",
+        why=(
+            "Pre-compilation validates type safety and package resolution before "
+            "Docker image creation."
+        ),
+        what_to_understand=(
+            "Compiling locally catches type errors and missing imports immediately."
+        ),
     )

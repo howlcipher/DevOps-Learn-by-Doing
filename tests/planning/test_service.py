@@ -18,3 +18,14 @@ def test_plan_uses_docker_run_when_kubernetes_is_not_used() -> None:
     operations = {(s.tool_name, s.operation) for s in plan.steps}
     assert ("docker", "run") in operations
     assert ("kubernetes", "rollout_status") not in operations
+
+
+def test_plan_generates_go_test_steps_when_language_is_go() -> None:
+    from devops_learn.domain.enums import LanguageKind
+
+    proposal = ArchitectureService(AzureProvider()).propose(())
+    plan = PlanningService().build_plan(proposal, language=LanguageKind.GO)
+    operations = [(s.tool_name, s.operation) for s in plan.steps]
+    assert ("go", "run_tests") in operations
+    assert ("go", "run_vet") in operations
+    assert ("python", "run_tests") not in operations

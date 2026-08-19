@@ -22,6 +22,7 @@ from devops_learn.domain.enums import (
     ExecutionMode,
     ExperienceState,
     ExplanationDepth,
+    LanguageKind,
     SecurityGateDecision,
 )
 from devops_learn.security.eligibility import evaluate_deployment_eligibility
@@ -321,6 +322,15 @@ def _preflight(platform: Platform, ui: Ui, options: DeployOptions) -> bool:
 
 
 def _validation(platform: Platform, project: Path) -> bool:
+    assessment = platform.analyzer.analyze(project)
+    if assessment.language is LanguageKind.GO:
+        return all(
+            platform.tool_service.invoke("go", operation, params).success
+            for operation, params in (
+                ("run_tests", {"path": str(project)}),
+                ("run_vet", {"path": str(project)}),
+            )
+        )
     return all(
         platform.tool_service.invoke("python", operation, params).success
         for operation, params in (

@@ -37,6 +37,7 @@ from devops_learn.tools.base import RiskLevel, Tool
 from devops_learn.tools.docker_tool import RealDockerTool, SimulatedDockerTool
 from devops_learn.tools.doctor_tool import EnvironmentDoctorTool
 from devops_learn.tools.git_tool import SimulatedGitTool
+from devops_learn.tools.go_tool import RealGoTool, SimulatedGoTool
 from devops_learn.tools.kubernetes_tool import SimulatedKubernetesTool
 from devops_learn.tools.python_tool import RealPythonTool, SimulatedPythonTool
 from devops_learn.tools.terraform_tool import RealTerraformTool, SimulatedTerraformTool
@@ -196,6 +197,7 @@ def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
         # simulated rather than provisioning real python/docker tools it never uses.
         return {
             "python": SimulatedPythonTool(),
+            "go": SimulatedGoTool(),
             "git": SimulatedGitTool(),
             "docker": SimulatedDockerTool(),
             "terraform": RealTerraformTool(),
@@ -207,6 +209,7 @@ def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
         return {
             "doctor": EnvironmentDoctorTool(),
             "python": RealPythonTool(),
+            "go": RealGoTool(),
             "git": SimulatedGitTool(),
             "docker": RealDockerTool(),
             "terraform": RealTerraformTool(),
@@ -221,6 +224,7 @@ def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
     if getattr(args, "real_tools", False) or args.command == "local" or is_troubleshoot_real:
         return {
             "python": RealPythonTool(),
+            "go": RealGoTool(),
             "git": SimulatedGitTool(),
             "docker": RealDockerTool(),
             "terraform": SimulatedTerraformTool(),

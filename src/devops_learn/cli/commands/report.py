@@ -54,13 +54,22 @@ def run(args: argparse.Namespace, platform: Platform) -> None:
         )
         sections["NOT EXECUTED"].append("Azure deployment")
     else:
-        if any(
+        has_python = any(
             e.event_type == AuditEventType.TOOL_INVOKED
             and isinstance(e.payload, dict)
             and e.payload.get("tool") == "python"
             for e in events
-        ):
+        )
+        has_go = any(
+            e.event_type == AuditEventType.TOOL_INVOKED
+            and isinstance(e.payload, dict)
+            and e.payload.get("tool") == "go"
+            for e in events
+        )
+        if has_python:
             sections["REAL PASS"].append("Python tests")
+        elif has_go:
+            sections["REAL PASS"].append("Go tests")
         else:
             sections["NOT EXECUTED"].append("Python tests")
 

@@ -23,6 +23,22 @@ jobs:
         run: cd projects/api_platform && mypy app --strict
       - name: Test
         run: pytest
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Go format check
+        run: test -z "$(gofmt -l projects/go_service)"
+      - name: Go vet
+        run: cd projects/go_service && go vet ./...
+      - name: Go test
+        run: cd projects/go_service && go test -v ./...
+      - name: Go build
+        run: cd projects/go_service && go build ./...
+      - name: Build Go container image
+        run: docker build -t go-service:ci projects/go_service
+      - name: Build Python container image
+        run: docker build -t api-platform:ci projects/api_platform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:

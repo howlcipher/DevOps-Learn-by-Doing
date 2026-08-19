@@ -45,9 +45,12 @@ _DATABASE_PATTERNS: tuple[tuple[str, str], ...] = (
 )
 
 _SECRET_NAME_PATTERN = re.compile(
-    r"os\.(?:environ(?:\.get)?|getenv)\(\s*['\"]([A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD)[A-Z0-9_]*)"
+    r"(?:os\.(?:environ(?:\.get)?|getenv|Getenv|LookupEnv))\("
+    r"\s*['\"]([A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD)[A-Z0-9_]*)"
 )
-_ENV_VAR_PATTERN = re.compile(r"os\.(?:environ(?:\.get)?|getenv)\(\s*['\"]([A-Z0-9_]+)")
+_ENV_VAR_PATTERN = re.compile(
+    r"(?:os\.(?:environ(?:\.get)?|getenv|Getenv|LookupEnv))\(\s*['\"]([A-Z0-9_]+)"
+)
 _HARDCODED_SECRET_PATTERN = re.compile(
     r"(?:API_KEY|SECRET|PASSWORD|TOKEN)\s*=\s*['\"][^'\"$]{6,}['\"]"
 )
@@ -164,8 +167,9 @@ class ProjectAnalyzer:
         )
 
     def _detect_language(self, root: Path) -> tuple[LanguageKind, list[Path]]:
-        if (root / "go.mod").exists():
-            return LanguageKind.GO, _iter_source_files(root, suffixes=(".go",))
+        go_files = _iter_source_files(root, suffixes=(".go",))
+        if (root / "go.mod").exists() or go_files:
+            return LanguageKind.GO, go_files
         py_files = _iter_source_files(root, suffixes=(".py",))
         if (root / "pyproject.toml").exists() or (root / "requirements.txt").exists() or py_files:
             return LanguageKind.PYTHON, py_files
@@ -209,7 +213,12 @@ class ProjectAnalyzer:
             r"prometheus|opentelemetry|application insights|log analytics", source_text, re.I
         ):
             return MaturityStatus.GOOD
-        if re.search(r"\blogging\.(getLogger|basicConfig)\b|structlog", source_text):
+        observability_pattern = (
+            r"\blogging\.(getLogger|basicConfig)\b|structlog|"
+            r"\b(?:log|slog)\.(?:New|Info|Debug|Warn|Error|Printf|Print|Println)\b|"
+            r"\b(?:zap|logrus)\b"
+        )
+        if re.search(observability_pattern, source_text):
             return MaturityStatus.PARTIAL
         return MaturityStatus.MISSING
 
