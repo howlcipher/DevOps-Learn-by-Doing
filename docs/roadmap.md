@@ -67,14 +67,23 @@ and PR CI. See `docs/devsecops.md`.
 The gate is now bound to each deployment candidate before any real apply. Live
 Azure verification remains the final opt-in acceptance step.
 
+## Milestone 4: realistic troubleshooting with recovery verification (done)
+
+`devops-learn troubleshoot` introduces structured operational incident recovery
+scenarios (`port_conflict`, `missing_config`, `health_check_failure`, `resource_limit`)
+with an explicit lifecycle:
+SETUP -> INJECT -> OBSERVE -> EXPLAIN -> REMEDIATE -> VERIFY -> CLEANUP.
+Observations are strictly separated from interpretations; progressive assistance
+(Levels 0-4) guides the learner without leaking answers; recovery is deterministically
+re-verified; and results are honestly distinguished between `LIVE VERIFIED` and
+`SIMULATED / TESTED`.
+
 ## Further out (not yet milestoned)
 
 - Real AWS/GCP `CloudProvider` implementations.
 - A bundled Go example project (detection already exists).
 - A richer `ProjectAnalyzer` (dependency graph analysis, actual secret-scanning
   integration, Helm/Kubernetes-manifest-aware analysis).
-- More troubleshooting scenarios beyond the readiness-probe and container-exit
-  cases.
 - A real Anthropic-backed explanation path tested end to end (V1 tests
   `AnthropicProvider` only for import/credential behavior, not live calls).
 - A web UI reusing the existing `workflows`/`Ui` boundary.

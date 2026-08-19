@@ -102,10 +102,14 @@ supply only `action` and render as one line.
 
 ## Troubleshooting
 
-See `troubleshooting/service.py`. `gather_evidence()` always runs before `diagnose()`; the
-platform never hands an LLM a one-line failure description and asks it to guess. V1 ships one
-deliberate simulated failure (a Kubernetes readiness probe pointed at the wrong path) so the
-mechanism is demonstrated end to end.
+See `troubleshooting/service.py` and `workflows/troubleshooting_flow.py`. Evidence gathering
+always precedes diagnosis: the platform never hands an LLM an unstructured failure description.
+The troubleshooting engine manages bounded operational recovery scenarios (`port_conflict`,
+`missing_config`, `health_check_failure`, `resource_limit`) with an explicit lifecycle:
+`SETUP -> INJECT -> OBSERVE -> EXPLAIN -> REMEDIATE -> VERIFY -> CLEANUP`.
+Observations (facts) are separated from interpretations (hypotheses), progressive hints (0-4)
+guide the learner without preempting discovery, and recovery is deterministically re-verified
+before completion.
 
 ## Persistence
 

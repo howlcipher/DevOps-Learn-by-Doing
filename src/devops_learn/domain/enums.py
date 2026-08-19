@@ -162,6 +162,10 @@ class AuditEventType(Enum):
     DEPLOYMENT_FAILED = "deployment_failed"
     TROUBLESHOOTING_STARTED = "troubleshooting_started"
     DIAGNOSIS_PRODUCED = "diagnosis_produced"
+    TROUBLESHOOTING_REMEDIATION_ATTEMPTED = "troubleshooting_remediation_attempted"
+    TROUBLESHOOTING_VERIFIED = "troubleshooting_verified"
+    TROUBLESHOOTING_FAILED = "troubleshooting_failed"
+    TROUBLESHOOTING_COMPLETED = "troubleshooting_completed"
     ROLLBACK_PERFORMED = "rollback_performed"
     SESSION_COMPLETED = "session_completed"
 
