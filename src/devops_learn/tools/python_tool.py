@@ -48,7 +48,7 @@ def _python_executable() -> str:
 
 
 def _run(
-    command: list[str], *, cwd: str | None, check: bool = False
+    command: list[str], *, cwd: str | None, check: bool = False, timeout: float = 60.0
 ) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     # User-installed pytest plugins are outside a scanned project's dependency
@@ -60,6 +60,7 @@ def _run(
         capture_output=True,
         text=True,
         check=check,
+        timeout=timeout,
         env=environment,
     )
 
@@ -137,29 +138,45 @@ class RealPythonTool(Tool):
             )
 
         cwd: str | None = params.get("path")
+        timeout = float(params.get("timeout", 60.0))
         try:
             if operation == "run_tests":
                 tests_path = (Path(cwd or ".").resolve() / "tests")
                 command = [_python_executable(), "-m", "pytest", str(tests_path)]
-                completed = _run(command, cwd=cwd)
+                completed = _run(command, cwd=cwd, timeout=timeout)
                 success = completed.returncode == 0
                 summary = (
                     completed.stdout.strip().splitlines()[-1] if completed.stdout else "no output"
                 )
                 details = {"returncode": completed.returncode, "stderr": completed.stderr}
             elif operation == "run_lint":
-                lint_paths = params.get("paths", ["src", "tests"])
+                raw_paths = params.get("paths", ["src", "tests"])
+                if isinstance(raw_paths, str):
+                    lint_paths = [raw_paths]
+                elif isinstance(raw_paths, (list, tuple)):
+                    lint_paths = [str(p) for p in raw_paths]
+                else:
+                    lint_paths = ["src", "tests"]
                 command = ["flake8", "--jobs", "1"] + lint_paths
-                completed = _run(command, cwd=cwd)
+                completed = _run(command, cwd=cwd, timeout=timeout)
                 success = completed.returncode == 0
                 summary = completed.stdout.strip() or "No lint issues found"
                 details = {"returncode": completed.returncode, "stderr": completed.stderr}
             else:  # run_typecheck
                 command = ["mypy"]
-                completed = _run(command, cwd=cwd)
+                completed = _run(command, cwd=cwd, timeout=timeout)
                 success = completed.returncode == 0
                 summary = completed.stdout.strip() or "No type issues found"
                 details = {"returncode": completed.returncode, "stderr": completed.stderr}
+        except subprocess.TimeoutExpired:
+            return ToolResult(
+                success=False,
+                summary=f"(real, failed) Execution timed out after {timeout}s",
+                details={"error": "timeout", "timeout": timeout},
+                risk_level=spec.risk_level,
+                was_dry_run=dry_run,
+                approval=approval,
+            )
         except (OSError, FileNotFoundError) as exc:
             return ToolResult(
                 success=False,

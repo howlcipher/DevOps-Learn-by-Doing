@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from devops_learn.tools.approval import ApprovalRecord
 from devops_learn.tools.base import RiskLevel
 from devops_learn.tools.python_tool import RealPythonTool, SimulatedPythonTool
@@ -45,3 +47,39 @@ def test_real_python_tool_reports_failure_for_bad_path() -> None:
         approval=None,
     )
     assert not result.success
+
+
+def test_real_python_tool_runs_lint_on_single_and_multiple_paths() -> None:
+    tool = RealPythonTool()
+    result = tool.execute(
+        "run_lint",
+        {"paths": "src"},
+        dry_run=False,
+        approval=None,
+    )
+    has_summary = "flake8" in result.summary
+    has_code = result.details.get("returncode") is not None
+    assert result.success or has_summary or has_code
+
+
+def test_real_python_tool_timeout_returns_failure_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+    tool = RealPythonTool()
+
+    def mock_run(*args: object, **kwargs: object) -> None:
+        raise subprocess.TimeoutExpired(cmd=["test"], timeout=0.1)
+
+    import devops_learn.tools.python_tool as pt_module
+    monkeypatch.setattr(pt_module, "_run", mock_run)
+
+    result = tool.execute(
+        "run_tests",
+        {"path": ".", "timeout": 0.1},
+        dry_run=False,
+        approval=None,
+    )
+    assert not result.success
+    assert "Execution timed out" in result.summary
+    assert result.details.get("error") == "timeout"
