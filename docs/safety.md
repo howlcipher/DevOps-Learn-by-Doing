@@ -5,9 +5,10 @@
 - `ProjectAnalyzer` performs a real, read-only inspection of whatever repository path it is
   given (including this repo's own `projects/api_platform/`): real file presence checks, real
   regex scans of real file contents. It executes nothing.
-- The demo FastAPI application (`projects/api_platform/`) is real, runnable code with real
-  tests.
-- `devops-learn local <path>` runs real `pytest`, `flake8`, `docker build`, `docker run`,
+- The demo FastAPI application (`projects/api_platform/`) and Go HTTP service
+  (`projects/go_service/`) are real, runnable codebases with real tests and Dockerfiles.
+- `devops-learn local <path>` runs real language toolchain commands (`pytest`, `flake8` for
+  Python; `go test`, `go vet`, `go build`, `gofmt -l .` for Go) and real `docker build`, `docker run`,
   `docker logs`, and `docker stop` against the project you provide, and performs a real HTTP
   health check against the running container.
 - `devops-learn terraform` runs real `terraform fmt`, `init`, `validate`, and `plan` (including
@@ -64,7 +65,7 @@ approval is required (`docs/adr/0003-human-approval-gates.md`).
 
 ## Real local execution safety
 
-`devops-learn local` only runs local tools (`python` and `docker`). It never provisions cloud
+`devops-learn local` only runs local tools (`python`, `go`, and `docker`). It never provisions cloud
 resources, applies Terraform, or modifies remote state. It:
 
 - builds and runs a container on your local Docker daemon,

@@ -78,10 +78,22 @@ Observations are strictly separated from interpretations; progressive assistance
 re-verified; and results are honestly distinguished between `LIVE VERIFIED` and
 `SIMULATED / TESTED`.
 
+## Milestone 5: bundled Go example project + real Go toolchain vertical slice (done)
+
+`RealGoTool` and `SimulatedGoTool` (`tools/go_tool.py`) implement the `Tool` interface:
+real `go test`, `go vet`, `go build`, `gofmt -l .`, and `go mod verify` execution via
+safe subprocess wrappers. The bundled `projects/go_service/` provides a real, runnable
+Go HTTP service with unit tests, structured JSON logging, non-root multi-stage Dockerfile,
+and `/health` & `/info` endpoints. `ProjectAnalyzer` detects Go projects generically from
+`go.mod` and `*.go` source files without path-name special casing. The `devops-learn local`
+command executes the full local slice (inspect -> fmt check -> vet -> test -> build ->
+Docker build -> run -> verify -> logs -> stop) against Go workloads, teaching Go-specific
+DevOps concepts (static binaries, multi-stage builds, go vet vs go test) just-in-time while
+maintaining full regression safety for Python workloads.
+
 ## Further out (not yet milestoned)
 
 - Real AWS/GCP `CloudProvider` implementations.
-- A bundled Go example project (detection already exists).
 - A richer `ProjectAnalyzer` (dependency graph analysis, actual secret-scanning
   integration, Helm/Kubernetes-manifest-aware analysis).
 - A real Anthropic-backed explanation path tested end to end (V1 tests

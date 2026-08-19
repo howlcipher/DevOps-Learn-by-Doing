@@ -9,29 +9,58 @@ human reviewing the plan is reviewing exactly what will run.
 from __future__ import annotations
 
 from devops_learn.domain.architecture_models import ArchitectureProposal
+from devops_learn.domain.enums import LanguageKind
 from devops_learn.domain.plan_models import ImplementationPlan, PlanStep
 from devops_learn.tools.approval import RiskLevel
 
 
 class PlanningService:
-    def build_plan(self, proposal: ArchitectureProposal) -> ImplementationPlan:
-        steps = [
-            PlanStep(
-                id="tests",
-                title="Run the test suite",
-                tool_name="python",
-                operation="run_tests",
-                risk_level=RiskLevel.SAFE,
-                requires_approval=False,
-            ),
-            PlanStep(
-                id="lint",
-                title="Run lint checks",
-                tool_name="python",
-                operation="run_lint",
-                risk_level=RiskLevel.SAFE,
-                requires_approval=False,
-            ),
+    def build_plan(
+        self,
+        proposal: ArchitectureProposal,
+        *,
+        language: LanguageKind = LanguageKind.PYTHON,
+    ) -> ImplementationPlan:
+        if language is LanguageKind.GO:
+            test_steps = [
+                PlanStep(
+                    id="tests",
+                    title="Run the Go test suite",
+                    tool_name="go",
+                    operation="run_tests",
+                    risk_level=RiskLevel.SAFE,
+                    requires_approval=False,
+                ),
+                PlanStep(
+                    id="vet",
+                    title="Run static analysis (go vet)",
+                    tool_name="go",
+                    operation="run_vet",
+                    risk_level=RiskLevel.SAFE,
+                    requires_approval=False,
+                ),
+            ]
+        else:
+            test_steps = [
+                PlanStep(
+                    id="tests",
+                    title="Run the test suite",
+                    tool_name="python",
+                    operation="run_tests",
+                    risk_level=RiskLevel.SAFE,
+                    requires_approval=False,
+                ),
+                PlanStep(
+                    id="lint",
+                    title="Run lint checks",
+                    tool_name="python",
+                    operation="run_lint",
+                    risk_level=RiskLevel.SAFE,
+                    requires_approval=False,
+                ),
+            ]
+
+        steps = test_steps + [
             PlanStep(
                 id="dockerfile_check",
                 title="Validate Dockerfile best practices",

@@ -43,6 +43,7 @@ from devops_learn.tools.cloud_tool import SimulatedCloudTool
 from devops_learn.tools.base import Tool
 from devops_learn.tools.docker_tool import SimulatedDockerTool
 from devops_learn.tools.git_tool import SimulatedGitTool
+from devops_learn.tools.go_tool import SimulatedGoTool
 from devops_learn.tools.kubernetes_tool import SimulatedKubernetesTool
 from devops_learn.tools.python_tool import SimulatedPythonTool
 from devops_learn.tools.service import ToolService
@@ -96,6 +97,7 @@ def build_platform(
         tools
         or {
             "python": SimulatedPythonTool(),
+            "go": SimulatedGoTool(),
             "git": SimulatedGitTool(),
             "docker": SimulatedDockerTool(),
             "terraform": SimulatedTerraformTool(),
