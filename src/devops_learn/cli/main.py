@@ -23,6 +23,7 @@ from devops_learn.cli.commands import (
     terraform,
     ai_test,
     config,
+    troubleshoot,
 )
 from devops_learn.config.settings import load_settings
 from devops_learn.domain.enums import ExecutionMode
@@ -61,6 +62,7 @@ _COMMAND_MODULES = (
     report,
     ai_test,
     config,
+    troubleshoot,
 )
 
 
@@ -215,7 +217,8 @@ def _tools_for_args(args: argparse.Namespace) -> dict[str, Tool] | None:
             "security_policy": PolicyTool(),
             "azure": AzureCliTool(),
         }
-    if getattr(args, "real_tools", False) or args.command == "local":
+    is_troubleshoot_real = args.command == "troubleshoot" and getattr(args, "real", False)
+    if getattr(args, "real_tools", False) or args.command == "local" or is_troubleshoot_real:
         return {
             "python": RealPythonTool(),
             "git": SimulatedGitTool(),

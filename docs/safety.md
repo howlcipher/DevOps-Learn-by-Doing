@@ -121,3 +121,20 @@ deliberately never returns a specific dollar figure, since it has no live
 pricing data to draw from.
 Cost impact in a `Recommendation` (e.g. "lower likely cost than a managed cluster") is always
 qualitative for the same reason.
+
+## Troubleshooting scenario safety and bounded fault injection
+
+`devops-learn troubleshoot` creates realistic operational failure scenarios while strictly
+preserving system integrity:
+
+- **Bounded resource constraints**: Memory limit testing is confined to isolated container
+  configurations (e.g. 6MB container limits) or deterministic simulations; it never starves or
+  exhausts host machine memory.
+- **Port isolation**: Port collisions use local ephemeral sockets/containers bound to loopback
+  (`127.0.0.1`) and are guaranteed to close during teardown.
+- **Harmless mock configurations**: Missing configuration scenarios test application fail-fast
+  behavior using non-sensitive mock settings (e.g. `REQUIRED_CONFIG_KEY`), never real secrets.
+- **Guaranteed teardown**: Every scenario runs cleanup inside a `finally` block to stop containers
+  and release occupied resources regardless of whether the exercise succeeds, fails, or is aborted.
+- **Honest capability reporting**: Scenarios clearly declare whether execution was `LIVE VERIFIED`
+  or `SIMULATED / TESTED`. If Docker is absent, execution falls back cleanly to simulation.
