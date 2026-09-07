@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://howlcipher.github.io/DevOps-Learn-by-Doing/sitemap.xml

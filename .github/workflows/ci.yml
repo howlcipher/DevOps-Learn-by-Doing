@@ -50,6 +50,8 @@ jobs:
         run: terraform -chdir=projects/api_platform/infra/terraform init -backend=false -input=false
       - name: Terraform validate
         run: terraform -chdir=projects/api_platform/infra/terraform validate
+      - name: Verify SEO Metadata & Artifacts
+        run: python3 scripts/test_seo.py
   security:
     runs-on: ubuntu-latest
     steps:
